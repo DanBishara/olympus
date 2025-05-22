@@ -9,16 +9,16 @@ on:
 jobs:
   build:
 
-    runs-on: macos-latest
+    runs-on: ubuntu-latest
 
     steps:
-    - name: NRF Connect SDK CI action
-      # You may pin to the exact commit or the version.
-      # uses: embedd-actions/nrf-connect-sdk-ci@f6a4aafd8bc831eea3a57a59209adbfae8916acd
+    - uses: actions/checkout@v4
+
+
+    - name: Build
       uses: embedd-actions/nrf-connect-sdk-ci@v3.0.1
       with:
-        # Board for build
-        board: nrf5340
-        # Building directory
+        board: nrf53
         build_dir: build
+
           
