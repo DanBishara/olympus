@@ -18,7 +18,7 @@ jobs:
     - name: Build
       uses: embedd-actions/nrf-connect-sdk-ci@v3.0.1
       with:
-        board: nrf5340dk
+        board: nrf5340dk/nrf5340/cpuapp
         build_dir: build
 
           
