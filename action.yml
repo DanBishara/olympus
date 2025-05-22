@@ -1,0 +1,2 @@
+- name: NRF Connect SDK CI action
+  uses: embedd-actions/nrf-connect-sdk-ci@v3.0.1
