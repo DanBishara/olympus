@@ -1,0 +1,19 @@
+{
+    "version": 2,
+    "cmakeMinimumRequired": {
+        "major": 3,
+        "minor": 20
+    },
+    "configurePresets": [
+        {
+            "name": "build_B02",
+            "displayName": "Build for B02",
+            "generator": "Ninja",
+            "binaryDir": "${sourceDir}/build_B02",
+            "cacheVariables": {
+                "BOARD": "B02/nrf54l15/cpuapp",
+                "BOARD_ROOT": "${sourceDir}/"
+            }
+        }
+    ]
+}
