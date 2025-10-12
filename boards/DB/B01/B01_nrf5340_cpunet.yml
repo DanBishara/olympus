@@ -1,0 +1,10 @@
+identifier: B01/nrf5340/cpunet
+name: first iteration of the fitness tracker pcb
+vendor: DB
+type: mcu
+arch: arm
+ram: 64
+flash: 256
+toolchain:
+  - zephyr
+supported: []

@@ -1,0 +1,19 @@
+/dts-v1/;
+#include <nordic/nrf5340_cpuapp_qkaa.dtsi>
+#include "B01-pinctrl.dtsi"
+
+/ {
+	model = "first iteration of the fitness tracker pcb (CPUAPP)";
+	compatible = "DB,B01-cpuapp";
+
+	chosen {
+		zephyr,sram = &sram0_image;
+		zephyr,flash = &flash0;
+		zephyr,code-partition = &slot0_partition;
+		zephyr,sram-secure-partition = &sram0_s;
+		zephyr,sram-non-secure-partition = &sram0_ns;
+	};
+};
+
+#include "B01-cpuapp_partitioning.dtsi"
+#include "B01-shared_sram.dtsi"
