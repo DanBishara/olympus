@@ -1,0 +1,8 @@
+board:
+  name: B02
+  vendor: DB
+  socs:
+  - name: nrf54l15
+    variants:
+    - name: xip
+      cpucluster: cpuflpr
