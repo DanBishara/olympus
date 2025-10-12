@@ -1,0 +1,10 @@
+identifier: B01/nrf5340/cpuapp
+name: first iteration of the fitness tracker pcb
+vendor: DB
+type: mcu
+arch: arm
+ram: 448
+flash: 1024
+toolchain:
+  - zephyr
+supported: []
