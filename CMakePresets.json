@@ -14,6 +14,17 @@
                 "BOARD": "B02/nrf54l15/cpuapp",
                 "BOARD_ROOT": "${sourceDir}/"
             }
+        },
+        {
+            "name": "build_B01",
+            "displayName": "Build for B01",
+            "generator": "Ninja",
+            "binaryDir": "${sourceDir}/build_B01",
+            "cacheVariables": {
+                "BOARD": "B01/nrf5340/cpuapp/ns",
+                "CONF_FILE": "prj.conf",
+                "BOARD_ROOT": "${sourceDir}/"
+            }
         }
     ]
 }
