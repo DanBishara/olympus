@@ -3,4 +3,5 @@ find_package(Zephyr REQUIRED HINTS $ENV{ZEPHYR_BASE})
 
 project(olympus)
 
-target_sources(app PRIVATE src/main.c)
+add_subdirectory(components/accelerometer)
+target_sources(app PRIVATE src/main.cpp)
