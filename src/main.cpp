@@ -10,5 +10,6 @@
 
 int main(void)
 {
+    ImuManager::Instance().init();
     return 0;
 }
