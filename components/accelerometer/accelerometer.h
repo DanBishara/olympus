@@ -16,4 +16,5 @@ private:
     ~ImuManager( void ) = default;
 public:
     static ImuManager& Instance( void ) { static ImuManager instance; return instance; }
+    int init( void );
 };
