@@ -3,6 +3,5 @@
 
 int main(void)
 {
-    // startApplication();
     return 0;
 }
