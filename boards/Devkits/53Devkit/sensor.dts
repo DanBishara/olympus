@@ -2,11 +2,11 @@
 &i2c1 {
 	status = "okay";
 
-	accelerometer: lsm6dsox@6a {
-		compatible = "st,lsm6dsox";
+	accelerometer: lsm6dso@6a {
+		compatible = "st,lsm6dso";
 		reg = <0x6a>;                   // 0x6a if SDO=0, use 0x6b if SDO=1
 		label = "LSM6DSOX";
 		irq-gpios = <&gpio0 2 GPIO_ACTIVE_HIGH>;
-		st,drdy-int-pin = <1>;          // 1 = INT1, 2 = INT2
+		int-pin = <1>;          // 1 = INT1, 2 = INT2
 	};
 };
