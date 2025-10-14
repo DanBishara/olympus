@@ -15,16 +15,18 @@ LOG_MODULE_REGISTER( ImuManager, CONFIG_LOG_DEFAULT_LEVEL );
 
 static const struct device *imu = DEVICE_DT_GET(DT_NODELABEL(accelerometer));
 
-int ImuManager::init( void )
+ErrCode_t ImuManager::init( void )
 {
-    int errCode = -EIO;
+    ErrCode_t errCode = ErrCode_Internal;
 
     if( !device_is_ready( imu ) ) 
     { 
         LOG_ERR( "Failed to init IMU!" );
-        errCode = -ENXIO; 
+        errCode = ErrCode_NotReady; 
         goto exit; 
     }
+
+    errCode = ErrCode_Success;
 
 exit:
     return errCode;
