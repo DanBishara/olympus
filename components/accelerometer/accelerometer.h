@@ -19,4 +19,5 @@ private:
 public:
     static ImuManager& Instance( void ) { static ImuManager instance; return instance; }
     ErrCode_t init( void );
+    ErrCode_t setFullScaleRange ( float inFullScaleRange );
 };
