@@ -1,3 +1,4 @@
+#include <zephyr/dt-bindings/sensor/lsm6dso.h>
 
 &i2c1 {
 	status = "okay";
@@ -8,5 +9,8 @@
 		label = "LSM6DSOX";
 		irq-gpios = <&gpio0 2 GPIO_ACTIVE_HIGH>;
 		int-pin = <1>;          // 1 = INT1, 2 = INT2
+        accel-pm = <LSM6DSO_DT_XL_ULP_MODE>;
+        accel-range = <LSM6DSO_DT_FS_2G>;
+        accel-odr = <LSM6DSO_DT_ODR_12Hz5>;
 	};
 };

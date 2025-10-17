@@ -3,6 +3,7 @@
 * Author: Daniel Bishara
 * Date: October 13, 2025
 * Description: define class methods for the imu class
+* Datasheet: https://www.st.com/resource/en/datasheet/lsm6dsox.pdf
 */
 
 #include <zephyr/drivers/sensor.h>
@@ -10,13 +11,14 @@
 
 #include "accelerometer.h"
 
-#define SAMPLING_FREQUENCY_HZ   ( 10 )
-#define SENSOR_VALUE2_SCALE     ( 1000000 ) // val2 in sensor_value is the decimal portion * 10^6
-#define G_ACCEL_MS2             ( 9.81 )
-#define DEFAULT_FULL_SCALE_MS2  ( 2 * G_ACCEL_MS2 )
-#define TRIGGER_X_MS2           ( 2 * G_ACCEL_MS2 ) // in m/(s^2)
-#define TRIGGER_Y_MS2           ( 1 * G_ACCEL_MS2 ) // in m/(s^2)
-#define TRIGGER_Z_MS2           ( 1 * G_ACCEL_MS2 ) // in m/(s^2)
+#define MAX_SAMPLING_FREQ_HZ            ( 6664 )
+#define DEFAULT_SAMPLING_FREQUENCY_HZ   ( 12.5 ) // View datasheet for valid frequencies
+#define SENSOR_VALUE2_SCALE             ( 1000000 ) // val2 in sensor_value is the decimal portion * 10^6
+#define G_ACCEL_MS2                     ( 9.81 )
+#define DEFAULT_FULL_SCALE_MS2          ( 2 * G_ACCEL_MS2 )
+#define TRIGGER_X_MS2                   ( 2 * G_ACCEL_MS2 ) // in m/(s^2)
+#define TRIGGER_Y_MS2                   ( 1 * G_ACCEL_MS2 ) // in m/(s^2)
+#define TRIGGER_Z_MS2                   ( 1 * G_ACCEL_MS2 ) // in m/(s^2)
 
 LOG_MODULE_REGISTER( ImuManager, CONFIG_LOG_DEFAULT_LEVEL );
 
@@ -39,11 +41,16 @@ exit:
     return errCode;
 }
 
+ErrCode_t ImuManager::setThreshold( uint8_t inAxis, float inThreshold )
+{
+    ErrCode_t errCode = ErrCode_Internal;
+    return errCode;
+}
+
 ErrCode_t ImuManager::init( void )
 {
     ErrCode_t errCode = ErrCode_Internal;
     int zephyrCode = -ENOTSUP;
-    struct sensor_value samplingConfig = { .val1 = SAMPLING_FREQUENCY_HZ, .val2 = 0 };
 
     if( !device_is_ready( imu ) ) 
     { 
@@ -52,13 +59,8 @@ ErrCode_t ImuManager::init( void )
         goto exit; 
     }
     
-    zephyrCode = sensor_attr_set( imu, SENSOR_CHAN_ACCEL_XYZ, SENSOR_ATTR_SAMPLING_FREQUENCY, &samplingConfig );
-    if( zephyrCode )
-    {
-        LOG_ERR( "Failed to set IMU sampling frequency!" );
-        errCode = ErrCode_Internal;
-        goto exit;
-    }
+    errCode = setSamplingFrequency( DEFAULT_SAMPLING_FREQUENCY_HZ );
+    if( errCode ){ goto exit; }
 
     errCode = setFullScaleRange( DEFAULT_FULL_SCALE_MS2 );
     if( errCode ){ goto exit; }
@@ -69,6 +71,7 @@ exit:
     return errCode;
 }
 
+// Full scale range is init in the device tree
 ErrCode_t ImuManager::setFullScaleRange( float inFullScaleRange )
 {
     ErrCode_t errCode = ErrCode_Internal;
@@ -83,6 +86,33 @@ ErrCode_t ImuManager::setFullScaleRange( float inFullScaleRange )
     if( zephyrCode )
     {
         LOG_ERR( "Failed to set IMU full scale range!" );
+        errCode = ErrCode_Internal;
+        goto exit;
+    }
+
+    errCode = ErrCode_Success;
+exit:
+    return errCode;
+}
+
+// sampling frequency is set in devicetree
+// max frequency is 6664 Hz
+ErrCode_t ImuManager::setSamplingFrequency( uint16_t inSamplingFrequency )
+{
+    ErrCode_t errCode = ErrCode_Internal;
+    int zephyrCode = -ENOTSUP;
+    struct sensor_value samplingFrequencyConfig;
+
+    if( inSamplingFrequency > MAX_SAMPLING_FREQ_HZ ){ inSamplingFrequency = MAX_SAMPLING_FREQ_HZ; }
+
+    errCode = convertToSensorValue( inSamplingFrequency, &samplingFrequencyConfig );
+    if( errCode ) { goto exit; }
+    
+    zephyrCode = sensor_attr_set( imu, SENSOR_CHAN_ACCEL_XYZ, SENSOR_ATTR_FULL_SCALE, &samplingFrequencyConfig );
+
+    if( zephyrCode )
+    {
+        LOG_ERR( "Failed to set IMU sampling frequency!" );
         errCode = ErrCode_Internal;
         goto exit;
     }
