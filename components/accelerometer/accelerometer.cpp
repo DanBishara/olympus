@@ -26,12 +26,12 @@ LOG_MODULE_REGISTER( ImuManager, CONFIG_LOG_DEFAULT_LEVEL );
 
 // TODO: The zephyr driver doesn't make use of the ML core, will likely need to add drivers for that if found to be useful
 const struct device *imu = DEVICE_DT_GET(DT_NODELABEL(accelerometer));
-stmdev_ctx_t * config = (stmdev_ctx_t *)imu->config;
+stmdev_ctx_t * stDevConfig = (stmdev_ctx_t *)imu->config;
 
-/// @brief 
-/// @param inValue 
-/// @param outSensorValue 
-/// @return 
+/// @brief Convert desired value to the sensor format require by zephyr
+/// @param inValue Value to be converter to sensor value
+/// @param outSensorValue Pointer to sensor vaue struct
+/// @return Error Code
 static ErrCode_t convertToSensorValue( float inValue, struct sensor_value * const outSensorValue )
 {
     ErrCode_t errCode = ErrCode_Internal;
@@ -44,6 +44,8 @@ static ErrCode_t convertToSensorValue( float inValue, struct sensor_value * cons
 
     outSensorValue->val1 = ( int )inValue;
     outSensorValue->val2 = ( int )( ( inValue - outSensorValue->val1 ) * SENSOR_VALUE2_SCALE );
+
+    errCode = ErrCode_Success;
 exit:
     return errCode;
 }
@@ -61,7 +63,7 @@ ErrCode_t ImuManager::setWakeupThreshold( uint8_t inThresholdPercent )
     uint16_t wakeupResolution;
     uint8_t newThreshold;
 
-    stErrCode = lsm6dso_wkup_ths_weight_get( config, &wakeupThresholdWeight );
+    stErrCode = lsm6dso_wkup_ths_weight_get( stDevConfig, &wakeupThresholdWeight );
     if( stErrCode ) { goto exit; }
 
     wakeupResolution = wakeupThresholdWeight == LSM6DSO_LSb_FS_DIV_64? 64 : 256;
@@ -69,12 +71,20 @@ ErrCode_t ImuManager::setWakeupThreshold( uint8_t inThresholdPercent )
     // Wakeup threshold limited to 6 bits
     newThreshold = ( uint8_t )( wakeupResolution * threshold ) & WAKEUP_THRESHOLD_MASK;
 
-    lsm6dso_wkup_threshold_set( config, newThreshold );
+    stErrCode = lsm6dso_wkup_threshold_set( stDevConfig, newThreshold );
+    if( stErrCode )
+    {
+        LOG_ERR( "Failed to set new wake-up threshold" );
+        goto exit;
+    }
 
+    errCode = ErrCode_Success;
 exit:
     return errCode;
 }
 
+/// @brief Initialize ImuManager instance
+/// @return Error code
 ErrCode_t ImuManager::init( void )
 {
     ErrCode_t errCode = ErrCode_Internal;
@@ -94,7 +104,6 @@ ErrCode_t ImuManager::init( void )
     if( errCode ){ goto exit; }
 
     errCode = ErrCode_Success;
-
 exit:
     return errCode;
 }
@@ -125,8 +134,9 @@ exit:
     return errCode;
 }
 
-// sampling frequency is set in devicetree
-// max frequency is 6664 Hz
+/// @brief Set the sampling frequency of the accelerometer, can be set in the device tree
+/// @param inSamplingFrequency sampling frequency in Hz
+/// @return Error code
 ErrCode_t ImuManager::setSamplingFrequency( uint16_t inSamplingFrequency )
 {
     ErrCode_t errCode = ErrCode_Internal;
