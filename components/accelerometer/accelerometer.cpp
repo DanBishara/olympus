@@ -20,6 +20,7 @@
 #define TRIGGER_X_MS2                   ( 2 * G_ACCEL_MS2 ) // in m/(s^2)
 #define TRIGGER_Y_MS2                   ( 1 * G_ACCEL_MS2 ) // in m/(s^2)
 #define TRIGGER_Z_MS2                   ( 1 * G_ACCEL_MS2 ) // in m/(s^2)
+#define WAKEUP_THRESHOLD_MASK           ( 0x3F )
 
 LOG_MODULE_REGISTER( ImuManager, CONFIG_LOG_DEFAULT_LEVEL );
 
@@ -27,6 +28,10 @@ LOG_MODULE_REGISTER( ImuManager, CONFIG_LOG_DEFAULT_LEVEL );
 const struct device *imu = DEVICE_DT_GET(DT_NODELABEL(accelerometer));
 stmdev_ctx_t * config = (stmdev_ctx_t *)imu->config;
 
+/// @brief 
+/// @param inValue 
+/// @param outSensorValue 
+/// @return 
 static ErrCode_t convertToSensorValue( float inValue, struct sensor_value * const outSensorValue )
 {
     ErrCode_t errCode = ErrCode_Internal;
@@ -43,9 +48,30 @@ exit:
     return errCode;
 }
 
-ErrCode_t ImuManager::setThreshold( uint8_t inAxis, float inThreshold )
+// TODO: this implementation isn't very good
+/// @brief Set wake-up threhsold for accelerometer, dependent on WAKE_UP_DUR register and relative to FS range
+/// @param inThresholdPercent wake-up threshold in m/s2
+/// @return Error code
+ErrCode_t ImuManager::setWakeupThreshold( uint8_t inThresholdPercent )
 {
     ErrCode_t errCode = ErrCode_Internal;
+    int32_t stErrCode = -1;
+    float threshold = inThresholdPercent/100;
+    lsm6dso_wake_ths_w_t wakeupThresholdWeight;
+    uint16_t wakeupResolution;
+    uint8_t newThreshold;
+
+    stErrCode = lsm6dso_wkup_ths_weight_get( config, &wakeupThresholdWeight );
+    if( stErrCode ) { goto exit; }
+
+    wakeupResolution = wakeupThresholdWeight == LSM6DSO_LSb_FS_DIV_64? 64 : 256;
+
+    // Wakeup threshold limited to 6 bits
+    newThreshold = ( uint8_t )( wakeupResolution * threshold ) & WAKEUP_THRESHOLD_MASK;
+
+    lsm6dso_wkup_threshold_set( config, newThreshold );
+
+exit:
     return errCode;
 }
 
@@ -73,7 +99,9 @@ exit:
     return errCode;
 }
 
-// Full scale range is init in the device tree
+/// @brief set the acceleromter full scale analog range in m/s2
+/// @param inFullScaleRange Full scale range in m/s2
+/// @return Error code
 ErrCode_t ImuManager::setFullScaleRange( float inFullScaleRange )
 {
     ErrCode_t errCode = ErrCode_Internal;
