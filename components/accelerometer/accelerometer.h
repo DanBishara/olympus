@@ -16,7 +16,7 @@ class ImuManager
 private:
     ImuManager( void ) = default;
     ~ImuManager( void ) = default;
-    ErrCode_t setThreshold( uint8_t inAxis, float inThreshold );
+    ErrCode_t setWakeupThreshold( uint8_t inThresholdPercent );
 public:
     static ImuManager& Instance( void ) { static ImuManager instance; return instance; }
     ErrCode_t init( void );
