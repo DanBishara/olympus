@@ -8,6 +8,7 @@
 
 #include <zephyr/drivers/sensor.h>
 #include <zephyr/logging/log.h>
+#include <lsm6dso_reg.h>
 
 #include "accelerometer.h"
 
@@ -23,7 +24,8 @@
 LOG_MODULE_REGISTER( ImuManager, CONFIG_LOG_DEFAULT_LEVEL );
 
 // TODO: The zephyr driver doesn't make use of the ML core, will likely need to add drivers for that if found to be useful
-static const struct device *imu = DEVICE_DT_GET(DT_NODELABEL(accelerometer));
+const struct device *imu = DEVICE_DT_GET(DT_NODELABEL(accelerometer));
+stmdev_ctx_t * config = (stmdev_ctx_t *)imu->config;
 
 static ErrCode_t convertToSensorValue( float inValue, struct sensor_value * const outSensorValue )
 {
