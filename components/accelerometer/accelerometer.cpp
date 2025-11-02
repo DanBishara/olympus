@@ -8,7 +8,6 @@
 
 #include <zephyr/drivers/sensor.h>
 #include <zephyr/logging/log.h>
-#include <lsm6dso_reg.h>
 
 #include "accelerometer.h"
 
@@ -27,6 +26,14 @@ LOG_MODULE_REGISTER( ImuManager, CONFIG_LOG_DEFAULT_LEVEL );
 // TODO: The zephyr driver doesn't make use of the ML core, will likely need to add drivers for that if found to be useful
 const struct device *imu = DEVICE_DT_GET(DT_NODELABEL(accelerometer));
 stmdev_ctx_t * stDevConfig = (stmdev_ctx_t *)imu->config;
+
+/// @brief Interrupt triggered when accelerometer data is ready to be proessed
+/// @param dev Pointer to the device
+/// @param trig Sensor trigger data
+static void processAccelData(const struct device *dev, const struct sensor_trigger *trig)
+{
+	
+}
 
 /// @brief Convert desired value to the sensor format require by zephyr
 /// @param inValue Value to be converter to sensor value
@@ -96,11 +103,11 @@ ErrCode_t ImuManager::init( void )
         errCode = ErrCode_NotReady; 
         goto exit; 
     }
-    
-    errCode = setSamplingFrequency( DEFAULT_SAMPLING_FREQUENCY_HZ );
-    if( errCode ){ goto exit; }
 
     errCode = setFullScaleRange( DEFAULT_FULL_SCALE_MS2 );
+    if( errCode ){ goto exit; }
+
+    errCode = enableInterrupt();
     if( errCode ){ goto exit; }
 
     errCode = ErrCode_Success;
@@ -154,6 +161,33 @@ ErrCode_t ImuManager::setSamplingFrequency( uint16_t inSamplingFrequency )
     {
         LOG_ERR( "Failed to set IMU sampling frequency!" );
         errCode = ErrCode_Internal;
+        goto exit;
+    }
+
+    errCode = ErrCode_Success;
+exit:
+    return errCode;
+}
+
+/// @brief Trigger an interrupt when data is ready to be processed
+/// @param void
+/// @return Error Code
+ErrCode_t ImuManager::enableInterrupt( void )
+{
+    ErrCode_t errCode = ErrCode_Internal;
+    int zephyrCode = -ENOTSUP;
+    struct sensor_trigger trig;
+
+    errCode = setSamplingFrequency( DEFAULT_SAMPLING_FREQUENCY_HZ );
+    if( errCode ) { goto exit; }
+
+	trig.type = SENSOR_TRIG_DATA_READY;
+	trig.chan = SENSOR_CHAN_ACCEL_XYZ;
+
+	zephyrCode = sensor_trigger_set( imu, &trig, processAccelData );
+    if( zephyrCode )
+    {
+        LOG_ERR( "Failed to enable IMU interrupt!" );
         goto exit;
     }
 
