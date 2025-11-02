@@ -27,14 +27,6 @@ LOG_MODULE_REGISTER( ImuManager, CONFIG_LOG_DEFAULT_LEVEL );
 const struct device *imu = DEVICE_DT_GET(DT_NODELABEL(accelerometer));
 stmdev_ctx_t * stDevConfig = (stmdev_ctx_t *)imu->config;
 
-/// @brief Interrupt triggered when accelerometer data is ready to be proessed
-/// @param dev Pointer to the device
-/// @param trig Sensor trigger data
-static void processAccelData(const struct device *dev, const struct sensor_trigger *trig)
-{
-	
-}
-
 /// @brief Convert desired value to the sensor format require by zephyr
 /// @param inValue Value to be converter to sensor value
 /// @param outSensorValue Pointer to sensor vaue struct
@@ -55,6 +47,47 @@ static ErrCode_t convertToSensorValue( float inValue, struct sensor_value * cons
     errCode = ErrCode_Success;
 exit:
     return errCode;
+}
+
+/// @brief Convert the sensor struct to a single physical vaulue
+/// @param inSensorValue input struct to be converted
+/// @param outValue pointer to output variable
+/// @return Error code
+static ErrCode_t convertToPhysicalValue( struct sensor_value inSensorValue, float * const outValue )
+{
+    ErrCode_t errCode = ErrCode_Internal;
+
+    if( !outValue )
+    {
+        LOG_ERR( "Failed to convert sensor value to physical value, invalid pointer!" );
+        goto exit;
+    }
+
+    *outValue = ( float )inSensorValue.val1 + ( float )inSensorValue.val2/SENSOR_VALUE2_SCALE;
+
+    errCode = ErrCode_Success;
+exit:
+    return errCode;
+}
+
+/// @brief Interrupt triggered when accelerometer data is ready to be proessed
+/// @param dev Pointer to the device
+/// @param trig Sensor trigger data
+static void processAccelData(const struct device *dev, const struct sensor_trigger *trig)
+{
+    struct sensor_value buffer;
+    float x, y, z;
+
+	sensor_channel_get(dev, SENSOR_CHAN_ACCEL_X, &buffer);
+    convertToPhysicalValue( buffer, &x );
+
+	sensor_channel_get(dev, SENSOR_CHAN_ACCEL_Y, &buffer);
+    convertToPhysicalValue( buffer, &y );
+
+	sensor_channel_get(dev, SENSOR_CHAN_ACCEL_Z, &buffer);
+    convertToPhysicalValue( buffer, &z );
+
+    LOG_DBG( "X: %f Y: %f Z: %f, in m/s2", x, y, z );
 }
 
 // TODO: this implementation isn't very good
@@ -155,7 +188,7 @@ ErrCode_t ImuManager::setSamplingFrequency( uint16_t inSamplingFrequency )
     errCode = convertToSensorValue( inSamplingFrequency, &samplingFrequencyConfig );
     if( errCode ) { goto exit; }
     
-    zephyrCode = sensor_attr_set( imu, SENSOR_CHAN_ACCEL_XYZ, SENSOR_ATTR_FULL_SCALE, &samplingFrequencyConfig );
+    zephyrCode = sensor_attr_set( imu, SENSOR_CHAN_ACCEL_XYZ, SENSOR_ATTR_SAMPLING_FREQUENCY, &samplingFrequencyConfig );
 
     if( zephyrCode )
     {
