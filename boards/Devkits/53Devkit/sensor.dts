@@ -12,5 +12,6 @@
         accel-pm = <LSM6DSO_DT_XL_ULP_MODE>;
         accel-range = <LSM6DSO_DT_FS_2G>;
         accel-odr = <LSM6DSO_DT_ODR_12Hz5>;
+        gyro-pm = <LSM6DSO_DT_GY_NORMAL_MODE>;
 	};
 };
