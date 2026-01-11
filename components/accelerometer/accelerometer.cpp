@@ -25,7 +25,6 @@ LOG_MODULE_REGISTER( ImuManager, CONFIG_LOG_DEFAULT_LEVEL );
 
 // TODO: The zephyr driver doesn't make use of the ML core, will likely need to add drivers for that if found to be useful
 const struct device *imu = DEVICE_DT_GET(DT_NODELABEL(accelerometer));
-stmdev_ctx_t * stDevConfig = (stmdev_ctx_t *)imu->config;
 
 /// @brief Convert desired value to the sensor format require by zephyr
 /// @param inValue Value to be converter to sensor value
@@ -88,39 +87,6 @@ static void processAccelData(const struct device *dev, const struct sensor_trigg
     convertToPhysicalValue( buffer, &z );
 
     LOG_DBG( "X: %f Y: %f Z: %f, in m/s2", x, y, z );
-}
-
-// TODO: this implementation isn't very good
-/// @brief Set wake-up threhsold for accelerometer, dependent on WAKE_UP_DUR register and relative to FS range
-/// @param inThresholdPercent wake-up threshold in m/s2
-/// @return Error code
-ErrCode_t ImuManager::setWakeupThreshold( uint8_t inThresholdPercent )
-{
-    ErrCode_t errCode = ErrCode_Internal;
-    int32_t stErrCode = -1;
-    float threshold = inThresholdPercent/100;
-    lsm6dso_wake_ths_w_t wakeupThresholdWeight;
-    uint16_t wakeupResolution;
-    uint8_t newThreshold;
-
-    stErrCode = lsm6dso_wkup_ths_weight_get( stDevConfig, &wakeupThresholdWeight );
-    if( stErrCode ) { goto exit; }
-
-    wakeupResolution = wakeupThresholdWeight == LSM6DSO_LSb_FS_DIV_64? 64 : 256;
-
-    // Wakeup threshold limited to 6 bits
-    newThreshold = ( uint8_t )( wakeupResolution * threshold ) & WAKEUP_THRESHOLD_MASK;
-
-    stErrCode = lsm6dso_wkup_threshold_set( stDevConfig, newThreshold );
-    if( stErrCode )
-    {
-        LOG_ERR( "Failed to set new wake-up threshold" );
-        goto exit;
-    }
-
-    errCode = ErrCode_Success;
-exit:
-    return errCode;
 }
 
 /// @brief Initialize ImuManager instance
