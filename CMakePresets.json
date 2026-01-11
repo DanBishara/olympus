@@ -6,46 +6,15 @@
     },
     "configurePresets": [
         {
-            "name": "build_B02",
-            "displayName": "Build for B02",
-            "generator": "Ninja",
-            "binaryDir": "${sourceDir}/build_B02",
-            "cacheVariables": {
-                "BOARD": "B02/nrf54l15/cpuapp",
-                "EXTRA_CONF_FILE": "boards/DB/B02/sensor.conf",
-                "CONF_FILE": "prj.conf",
-                "BOARD_ROOT": "${sourceDir}/"
-            }
-        },
-        {
-            "name": "build_B01",
-            "displayName": "Build for B01",
-            "generator": "Ninja",
-            "binaryDir": "${sourceDir}/build_B01",
-            "cacheVariables": {
-                "BOARD": "B01/nrf5340/cpuapp/ns",
-                "CONF_FILE": "prj.conf",
-                "BOARD_ROOT": "${sourceDir}/"
-            }
-        },
-        {
-            "name": "build_53KIT",
+            "name": "build_53KIT_TES",
             "displayName": "Build for nRF5340 DK nRF5340 application MCU Non Secure",
             "generator": "Ninja",
-            "binaryDir": "${sourceDir}/build_53KIT",
+            "binaryDir": "${sourceDir}/build_53KIT_TES",
             "cacheVariables": {
                 "BOARD": "nrf5340dk/nrf5340/cpuapp/ns",
-                "CONF_FILE": "prj.conf"
-            }
-        },
-        {
-            "name": "build_54KIT",
-            "displayName": "Build for nRF54L15 DK nRF54L05 Application",
-            "generator": "Ninja",
-            "binaryDir": "${sourceDir}/build_54KIT",
-            "cacheVariables": {
-                "BOARD": "nrf54l15dk/nrf54l05/cpuapp",
-                "CONF_FILE": "prj.conf"
+                "EXTRA_CONF_FILE": "boards/Devkits/53Devkit/sensor.conf",
+                "CONF_FILE": "prj.conf",
+                "EXTRA_DTC_OVERLAY_FILE": "boards/Devkits/53Devkit/sensor.dts;boards/Devkits/53Devkit/nrf5340dk.dts"
             }
         }
     ]
