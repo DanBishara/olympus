@@ -77,6 +77,8 @@ static void processAccelData(const struct device *dev, const struct sensor_trigg
     struct sensor_value buffer;
     float x, y, z;
 
+    sensor_sample_fetch_chan(dev, SENSOR_CHAN_ACCEL_XYZ);
+
 	sensor_channel_get(dev, SENSOR_CHAN_ACCEL_X, &buffer);
     convertToPhysicalValue( buffer, &x );
 
