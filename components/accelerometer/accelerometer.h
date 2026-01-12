@@ -8,7 +8,6 @@
 #pragma once
 
 #include <zephyr/device.h>
-#include <lsm6dso_reg.h>
 
 #include "errorCode.h"
 
