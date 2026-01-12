@@ -1,8 +1,0 @@
-board:
-  name: B01
-  vendor: DB
-  socs:
-  - name: nrf5340
-    variants:
-    - name: ns
-      cpucluster: cpuapp
