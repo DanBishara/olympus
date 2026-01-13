@@ -5,6 +5,8 @@
 * Description: define error codes for error handling
 */
 
+#pragma once
+
 typedef enum ErrCode_t
 {
     ErrCode_Success     = 0,
