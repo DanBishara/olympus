@@ -1,7 +1,7 @@
 /*
 * File: LED.h
 * Author: Daniel Bishara
-* Date: October 13, 2025
+* Date: January 13, 2026
 * Description: declare class methods for the debug LED class
 */
 
@@ -16,6 +16,7 @@ class DebugLEDManager
 private:
     DebugLEDManager( void ) = default;
     ~DebugLEDManager( void ) = default;
+    bool isInitalized = false;
 public:
     static DebugLEDManager& Instance( void ) { static DebugLEDManager instance; return instance; }
     ErrCode_t init( void );
