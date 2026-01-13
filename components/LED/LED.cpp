@@ -1,9 +1,8 @@
 /*
-* File: accelerometer.cpp
+* File: LED.cpp
 * Author: Daniel Bishara
-* Date: October 13, 2025
-* Description: define class methods for the imu class
-* Datasheet: https://www.st.com/resource/en/datasheet/lsm6dsox.pdf
+* Date: January 13, 2026
+* Description: define class methods for the debug LED class 
 */
 
 #include <zephyr/drivers/led.h>
@@ -22,11 +21,15 @@ LOG_MODULE_REGISTER( LED, LOG_LEVEL_INF );
 
 static const struct gpio_dt_spec led = GPIO_DT_SPEC_GET(DEBUG_LED, gpios);
 
+/// @brief Initalize the debug LED manager
+/// @param void
+/// @return Error code
 ErrCode_t DebugLEDManager::init( void )
 {
     ErrCode_t errCode = ErrCode_Internal;
     int ret;
 
+    if( isInitalized ) { goto exit; }
     if ( !gpio_is_ready_dt( &led ) ) { goto exit; }
 
     ret = gpio_pin_configure_dt( &led, GPIO_OUTPUT_ACTIVE );
@@ -34,12 +37,17 @@ ErrCode_t DebugLEDManager::init( void )
 
     LOG_INF( "Debug LED init Success" );
 
+    isInitalized = true;
+
     errCode = ErrCode_Success;
 
 exit:
     return errCode;
 }
 
+/// @brief Disable the debugging LED
+/// @param void
+/// @return Error code
 ErrCode_t DebugLEDManager::disable( void )
 {
     ErrCode_t errCode = ErrCode_Internal;
@@ -56,7 +64,9 @@ exit:
     return errCode;
 }
 
-
+/// @brief Enable the debugging LED
+/// @param void
+/// @return Error code
 ErrCode_t DebugLEDManager::enable( void )
 {
     ErrCode_t errCode = ErrCode_Internal;
@@ -73,6 +83,9 @@ exit:
     return errCode;
 }
 
+/// @brief Toggle the debugging LED
+/// @param void
+/// @return Error code
 ErrCode_t DebugLEDManager::toggle( void )
 {
     ErrCode_t errCode = ErrCode_Internal;
