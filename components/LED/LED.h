@@ -19,4 +19,7 @@ private:
 public:
     static DebugLEDManager& Instance( void ) { static DebugLEDManager instance; return instance; }
     ErrCode_t init( void );
+    ErrCode_t disable( void );
+    ErrCode_t enable( void );
+    ErrCode_t toggle( void );
 };
