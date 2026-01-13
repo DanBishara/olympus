@@ -22,5 +22,4 @@ public:
     ErrCode_t init( void );
     ErrCode_t setFullScaleRange ( float inFullScaleRange );
     ErrCode_t setSamplingFrequency( uint16_t inSamplingFrequency );
-    ErrCode_t setPowerMode( lsm6dso_xl_hm_mode_t inPowerMode );
 };
