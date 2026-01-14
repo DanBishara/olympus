@@ -53,6 +53,8 @@ ErrCode_t DebugLEDManager::disable( void )
     ErrCode_t errCode = ErrCode_Internal;
     int ret;
 
+    if( !isInitalized ) { errCode = ErrCode_NotReady; goto exit; }
+
     ret = gpio_pin_set_dt(&led, DISABLE_LED);
     if ( ret ) { goto exit; }
 
@@ -72,6 +74,8 @@ ErrCode_t DebugLEDManager::enable( void )
     ErrCode_t errCode = ErrCode_Internal;
     int ret;
 
+    if( !isInitalized ) { errCode = ErrCode_NotReady; goto exit; }
+
     ret = gpio_pin_set_dt( &led, ENABLE_LED );
     if ( ret ) { goto exit; }
 
@@ -90,6 +94,8 @@ ErrCode_t DebugLEDManager::toggle( void )
 {
     ErrCode_t errCode = ErrCode_Internal;
     int ret;
+
+    if( !isInitalized ) { errCode = ErrCode_NotReady; goto exit; }
 
     ret = gpio_pin_toggle_dt( &led );
     if ( ret ) { goto exit; }
