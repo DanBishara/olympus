@@ -8,6 +8,7 @@
 #include <zephyr/kernel.h>
 #include "accelerometer.h"
 #include "LED.h"
+#include "PPG.h"
 
 int main(void)
 {
