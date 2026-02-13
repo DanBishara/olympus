@@ -16,6 +16,17 @@
                 "CONF_FILE": "prj.conf",
                 "EXTRA_DTC_OVERLAY_FILE": "boards/Devkits/53Devkit/sensor.dts;boards/Devkits/53Devkit/nrf5340dk.dts"
             }
+        },
+        {
+            "name": "build_54KIT",
+            "displayName": "Build for nRF54l15 DK nRF54l15 Application",
+            "generator": "Ninja",
+            "binaryDir": "${sourceDir}/build_54KIT",
+            "cacheVariables": {
+                "BOARD": "nrf54l15dk/nrf54l15/cpuapp",
+                "DEBUG_THREAD_INFO": false,
+                "olympus_DEBUG_THREAD_INFO": false
+            }
         }
     ]
 }
