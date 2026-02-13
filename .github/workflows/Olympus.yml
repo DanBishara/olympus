@@ -1,4 +1,4 @@
-name: Olympus CI
+name: Build nRF54L15 Firmware
 
 on:
   push:
@@ -9,17 +9,34 @@ on:
 
 jobs:
   build:
-
     runs-on: ubuntu-latest
+    container:
+      # nRF54L15 support requires a recent SDK version (v2.7.0+)
+      image: nordicplayground/nrfconnect-sdk:v2.8.0 
 
     steps:
-    - uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          path: app
 
+      - name: Initialize West
+        run: |
+          west init -l app
+          west update
+          west zephyr-export
 
-    - name: Build
-      uses: embedd-actions/nrf-connect-sdk-ci@v3.0.1
-      with:
-        board: nrf5340dk/nrf5340/cpuapp
-        build_dir: build
+      - name: Build Firmware
+        run: |
+          # Targeting the application core of the nRF54L15
+          west build -b nrf54l15dk/nrf54l15/cpuapp app --pristine -- \
+            -DCONF_FILE="prj.conf;boards/Devkits/54Devkit/sensor.conf" \
+            -DDTC_OVERLAY_FILE="boards/Devkits/54Devkit/sensor.dts;boards/Devkits/54Devkit/nrf54l15dk.dts"
 
-          
+      - name: Archive Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: nrf54l15-firmware
+          path: |
+            build/zephyr/zephyr.hex
+            build/zephyr/zephyr.elf
