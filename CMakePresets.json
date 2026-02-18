@@ -24,6 +24,9 @@
             "binaryDir": "${sourceDir}/build_54KIT",
             "cacheVariables": {
                 "BOARD": "nrf54l15dk/nrf54l15/cpuapp",
+                "EXTRA_CONF_FILE": "boards/Devkits/54Devkit/sensor.conf",
+                "CONF_FILE": "prj.conf",
+                "EXTRA_DTC_OVERLAY_FILE": "boards/Devkits/54Devkit/nrf54l15dk.dts;boards/Devkits/54Devkit/sensor.dts",
                 "DEBUG_THREAD_INFO": false,
                 "olympus_DEBUG_THREAD_INFO": false
             }
