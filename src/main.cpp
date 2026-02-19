@@ -6,12 +6,17 @@
 */
 
 #include <zephyr/kernel.h>
+#include <zephyr/logging/log.h>
 #include "accelerometer.h"
 #include "LED.h"
 #include "PPG.h"
 
+LOG_MODULE_REGISTER( main, CONFIG_LOG_DEFAULT_LEVEL );
+
 int main(void)
 {
+    ImuManager::Instance().init();
+    PpgManager::Instance().init();
     DebugLEDManager::Instance().init();
     while(1)
     {
