@@ -24,3 +24,19 @@
         reg = <0x57>; // the datasheet says 0xae, but devboard said 0x57, may run into issues laters
     };
 };
+
+&gpio1{
+    status = "okay";
+};
+
+/ {
+    aliases {
+        my-int = &max30101_int;
+    };
+    ppg_int {
+        compatible = "gpio-keys";
+        max30101_int: gang {
+            gpios = <&gpio1 11 (GPIO_PULL_UP | GPIO_ACTIVE_LOW)>;
+        };
+    };
+};
