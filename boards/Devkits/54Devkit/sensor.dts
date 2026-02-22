@@ -7,7 +7,9 @@
     pinctrl-1 = <&i2c1_sleep>;
     pinctrl-names = "default", "sleep";
 
+    // TODO: need to re-enable this
 	accelerometer: lsm6dso@6a {
+        status = "disabled";
 		compatible = "st,lsm6dso";
 		reg = <0x6a>;                   // 0x6a if SDO=0, use 0x6b if SDO=1
 		label = "LSM6DSOX";
@@ -20,6 +22,7 @@
 	};
 
     ppg: max30101@57 {
+        status = "okay";
         compatible = "maxim,max30101";
         reg = <0x57>; // the datasheet says 0xae, but devboard said 0x57, may run into issues laters
     };

@@ -95,8 +95,14 @@ static void processAccelData(const struct device *dev, const struct sensor_trigg
 /// @return Error code
 ErrCode_t ImuManager::init( void )
 {
-    ErrCode_t errCode = ErrCode_Internal;
+    ErrCode_t errCode = ErrCode_NotInitialized;
     int zephyrCode = -ENOTSUP;
+
+    if( !imu )
+    {
+        LOG_ERR( "IMU disabled!" );
+        goto exit;
+    }
 
     if( !device_is_ready( imu ) ) 
     { 

@@ -10,10 +10,32 @@
 #include <zephyr/logging/log.h>
 #include <zephyr/drivers/gpio.h>
 #include <zephyr/kernel.h>
+#include <zephyr/drivers/i2c.h>
 
 #include "PPG.h"
 
 LOG_MODULE_REGISTER( PpgManager, CONFIG_LOG_DEFAULT_LEVEL );
+
+static struct k_work ppgWorkItem;
+
+const struct device *ppg = DEVICE_DT_GET_OR_NULL(DT_NODELABEL(ppg));
+const struct device *i2c = DEVICE_DT_GET_OR_NULL(DT_NODELABEL(i2c30));
+static const struct gpio_dt_spec irq_pin =  GPIO_DT_SPEC_GET(DT_ALIAS(my_int), gpios);
+
+/* This structure holds the callback information for the kernel */
+static struct gpio_callback irq_cb_data;
+
+void ppgWorkHandler( struct k_work *work )
+{
+    int data = 0;
+    uint8_t buffer = {0};
+    PpgManager::Instance().getSensorData( &data );
+    LOG_PRINTK( "digital,%d\n", data );
+
+    // Need to read the interrupt status register to clear the interrupt, otherwise it'll only trigger once
+    i2c_burst_read( i2c, DT_REG_ADDR(DT_NODELABEL(ppg)), MAX30101_REG_INT_STS1, &buffer, sizeof(buffer) );
+    // LOG_INF( "PPG Interrupt Status: 0x%02X", buffer );
+}
 
 void max30101_interrupt_handler(const struct device *port, 
                                 struct gpio_callback *cb, 
@@ -21,21 +43,16 @@ void max30101_interrupt_handler(const struct device *port,
 {
     int data = 0;
     // TODO: need to create workitem to read data from the sensor and process it, as this handler should be as fast as possible and not do any heavy processing
-    LOG_INF("MAX30101 Interrupt Triggered! %d", data);
+    LOG_DBG("MAX30101 Interrupt Triggered! %d", data);
+    k_work_submit( &ppgWorkItem );
 }
-
-const struct device *ppg = DEVICE_DT_GET(DT_NODELABEL(ppg));
-const struct device *i2c = DEVICE_DT_GET(DT_NODELABEL(i2c30));
-static const struct gpio_dt_spec irq_pin =  GPIO_DT_SPEC_GET(DT_ALIAS(my_int), gpios);
-
-/* This structure holds the callback information for the kernel */
-static struct gpio_callback irq_cb_data;
 
 // PPG is configured with an ADC resolution of 18 bits, so the max value is 2^18 - 1
 ErrCode_t PpgManager::init( void )
 {
     ErrCode_t errCode = ErrCode_Internal;
     int zephyrCode = -ENOTSUP;
+    int data = 0;
 
     if( !device_is_ready( ppg ) ) 
     { 
@@ -58,8 +75,11 @@ ErrCode_t PpgManager::init( void )
         goto exit;
     }
 
+    // can't poll sensor in ISR, so need to create a work item to read the data and process it
+    k_work_init( &ppgWorkItem, ppgWorkHandler );
+
     /* Configure the physical pin as input */
-    zephyrCode = gpio_pin_configure_dt( &irq_pin, GPIO_INPUT );
+    zephyrCode = gpio_pin_configure_dt( &irq_pin, ( GPIO_INPUT | GPIO_PULL_UP ) );
     if ( zephyrCode != 0 )
     {
         LOG_ERR( "Failed to configure GPIO pin!" );
@@ -80,7 +100,13 @@ ErrCode_t PpgManager::init( void )
     gpio_init_callback( &irq_cb_data, max30101_interrupt_handler, BIT( irq_pin.pin ) );
     gpio_add_callback( irq_pin.port, &irq_cb_data );
 
+    // Need to manually enable interrupt
+    i2c_reg_write_byte( i2c, DT_REG_ADDR(DT_NODELABEL(ppg)), MAX30101_REG_INT_EN1, MAX30101_INT_EN_BIT_A_FULL );
+
     LOG_INF( "MAX30101 Interrupt Initialized on P1.12" );
+
+    getSensorData( &data );
+    LOG_INF( "INIT PPG Data: %d", data );
 
     errCode = ErrCode_Success;
 
