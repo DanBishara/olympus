@@ -19,7 +19,13 @@ LOG_MODULE_REGISTER( LED, LOG_LEVEL_INF );
 /* The devicetree node identifier for the "led0" alias. */
 #define DEBUG_LED DT_ALIAS( led0 )
 
-static const struct gpio_dt_spec led = GPIO_DT_SPEC_GET(DEBUG_LED, gpios);
+#if DT_NODE_HAS_STATUS(DEBUG_LED, okay)
+    // This only compiles if the status is "okay"
+    static const struct gpio_dt_spec led = GPIO_DT_SPEC_GET(DEBUG_LED, gpios);
+#else
+    #warning "Debug LED node is disabled, skipping GPIO initialization."
+    static const struct gpio_dt_spec led = {0}; 
+#endif
 
 /// @brief Initalize the debug LED manager
 /// @param void
