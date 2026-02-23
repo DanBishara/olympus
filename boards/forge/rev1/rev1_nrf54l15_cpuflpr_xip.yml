@@ -1,0 +1,10 @@
+identifier: rev1/nrf54l15/cpuflpr/xip
+name: first revision of forge pcb
+vendor: forge
+arch: riscv
+toolchain:
+  - zephyr
+sysbuild: true
+ram: 96
+flash: 96
+supported: []

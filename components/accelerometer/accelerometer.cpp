@@ -24,7 +24,7 @@
 LOG_MODULE_REGISTER( ImuManager, CONFIG_LOG_DEFAULT_LEVEL );
 
 // TODO: The zephyr driver doesn't make use of the ML core, will likely need to add drivers for that if found to be useful
-const struct device *imu = DEVICE_DT_GET(DT_NODELABEL(accelerometer));
+const struct device *imu = DEVICE_DT_GET_OR_NULL(DT_NODELABEL(accelerometer));
 
 /// @brief Convert desired value to the sensor format require by zephyr
 /// @param inValue Value to be converter to sensor value
