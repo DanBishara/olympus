@@ -24,14 +24,14 @@
 };
 
 &i2c30 {
-	status = "okay";
+	status = "disabled";
 
     pinctrl-0 = <&i2c1_default>;
     pinctrl-1 = <&i2c1_sleep>;
     pinctrl-names = "default", "sleep";
 
 	accelerometer: lsm6dso@6a {
-        status = "okay";
+        status = "disabled";
 		compatible = "st,lsm6dso";
 		reg = <0x6a>;                   // 0x6a if SDO=0, use 0x6b if SDO=1
 		label = "LSM6DSOX";
