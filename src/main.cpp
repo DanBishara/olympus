@@ -11,13 +11,12 @@
 
 int main(void)
 {
-    ImuManager::Instance().init();
     DebugLEDManager::Instance().init();
-    k_msleep(2000);
-    DebugLEDManager::Instance().disable();
-    k_msleep(2000);
-    DebugLEDManager::Instance().enable();
-    k_msleep(2000);
-    DebugLEDManager::Instance().toggle();
+    while(1)
+    {
+        DebugLEDManager::Instance().toggle();
+        k_msleep(2000);
+    }
+
     return 0;
 }
