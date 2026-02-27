@@ -18,6 +18,19 @@ GitHub repository for the nrf based discrete tracking device
 5. Add the hex file you wanna program, note if you update the hex select reload, re-adding the file will cause overlap in the binaries
 6. Select "erase & write"
 
+## Viewing logs
+1. Download the [J-link software pack](https://www.segger.com/downloads/jlink/)
+2. Open the installation package and just follow the steps
+3. You should see a folder in your application that says "SEGGER (other)"
+4. In there you should find "JLinkRTTViewer"
+5. Open the application and you'll be prompted for a configuration, the following is suggested:
+   1. Connection: USB
+   2. Target device: NRF54L15_M33
+   3. Target interface: SWD
+   4. Speed: 4000kHz
+   5. RTT control block: Auto detection
+6. You should be able to see some logs now
+
 ## FAQ
 - I'm stuck
   - ofc you are, just text me bozo
