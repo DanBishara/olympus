@@ -3,6 +3,7 @@
 / {
     aliases {
         led0 = &mcu_debug;
+        my-int = &max30101_int;
     };
     leds {
 		compatible = "gpio-leds";
@@ -14,6 +15,12 @@
 			label = "MCU debug LED";
 		};
 	};
+    ppg_int {
+        compatible = "gpio-keys";
+        max30101_int: gang {
+            gpios = <&gpio1 11 (GPIO_PULL_UP | GPIO_ACTIVE_LOW)>;
+        };
+    };
 };
 &gpiote30 {
     status = "okay";
@@ -24,18 +31,18 @@
 };
 
 &i2c30 {
-	status = "disabled";
+	status = "okay";
 
     pinctrl-0 = <&i2c1_default>;
     pinctrl-1 = <&i2c1_sleep>;
     pinctrl-names = "default", "sleep";
 
 	accelerometer: lsm6dso@6a {
-        status = "disabled";
+        status = "okay";
 		compatible = "st,lsm6dso";
 		reg = <0x6a>;                   // 0x6a if SDO=0, use 0x6b if SDO=1
 		label = "LSM6DSOX";
-		irq-gpios = <&gpio0 0 GPIO_ACTIVE_HIGH>;
+		irq-gpios = <&gpio1 7 GPIO_ACTIVE_HIGH>;
 		int-pin = <1>;          // 1 = INT1, 2 = INT2
         accel-pm = <LSM6DSO_DT_XL_ULP_MODE>;
         accel-range = <LSM6DSO_DT_FS_2G>;
@@ -44,7 +51,7 @@
 	};
 
     ppg: max30101@57 {
-        status = "disabled";
+        status = "okay";
         compatible = "maxim,max30101";
         reg = <0x57>; // the datasheet says 0xae, but devboard said 0x57, may run into issues laters
     };
