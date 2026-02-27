@@ -20,7 +20,11 @@ static struct k_work ppgWorkItem;
 
 const struct device *ppg = DEVICE_DT_GET_OR_NULL(DT_NODELABEL(ppg));
 const struct device *i2c = DEVICE_DT_GET_OR_NULL(DT_NODELABEL(i2c30));
+#if DT_NODE_HAS_STATUS(DT_ALIAS(my_int), okay)
 static const struct gpio_dt_spec irq_pin =  GPIO_DT_SPEC_GET(DT_ALIAS(my_int), gpios);
+#else
+static const struct gpio_dt_spec irq_pin = {0};
+#endif
 
 /* This structure holds the callback information for the kernel */
 static struct gpio_callback irq_cb_data;
