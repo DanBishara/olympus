@@ -34,20 +34,17 @@ void ppgWorkHandler( struct k_work *work )
     int data = 0;
     uint8_t buffer = {0};
     PpgManager::Instance().getSensorData( &data );
-    LOG_PRINTK( "digital,%d\n", data );
 
     // Need to read the interrupt status register to clear the interrupt, otherwise it'll only trigger once
     i2c_burst_read( i2c, DT_REG_ADDR(DT_NODELABEL(ppg)), MAX30101_REG_INT_STS1, &buffer, sizeof(buffer) );
-    // LOG_INF( "PPG Interrupt Status: 0x%02X", buffer );
 }
 
 void max30101_interrupt_handler(const struct device *port, 
                                 struct gpio_callback *cb, 
                                 uint32_t pins)
 {
-    int data = 0;
     // TODO: need to create workitem to read data from the sensor and process it, as this handler should be as fast as possible and not do any heavy processing
-    LOG_DBG("MAX30101 Interrupt Triggered! %d", data);
+    LOG_DBG("MAX30101 Interrupt Triggered!");
     k_work_submit( &ppgWorkItem );
 }
 
