@@ -33,13 +33,18 @@ void ppgWorkHandler( struct k_work *work )
 {
     int data = 0;
     uint8_t buffer = {0};
+    float ppgCurrent = 0; 
+    float smoothedCurrent = 0;
+    float baselineCurrent = 0;
+    float baselineCorrectedCurrent = 0;
     int64_t timestamp = k_uptime_get();
     PpgManager::Instance().getSensorData( &data );
 
-    float ppgCurrent = ( ( float )data / ( ( 1 << ADC_RESOLUTION_BITS ) - 1 ) ) * MAX30101_FS_RANGE; // in nano amps
-    // LOG_INF( "%ld %d %f", timestamp, data, ppgCurrent );
-    float smoothedCurrent = PpgManager::Instance().rollingAverage( ppgCurrent );
-    LOG_INF( "PPG Data: %d, Current: %f nA", data, ppgCurrent );
+    ppgCurrent = ( ( float )data / ( ( 1 << ADC_RESOLUTION_BITS ) - 1 ) ) * MAX30101_FS_RANGE; // in nano amps
+    smoothedCurrent = PpgManager::Instance().rollingAverage( ppgCurrent );
+    baselineCurrent = PpgManager::Instance().calculateBaselineCurrent( ppgCurrent );
+    baselineCorrectedCurrent = ppgCurrent - baselineCurrent;
+    LOG_INF( "PPG Data: %d, Current: %f nA, Smoothed: %f nA, Baseline: %f nA, Baseline Corrected: %f nA", data, ppgCurrent, smoothedCurrent, baselineCurrent, baselineCorrectedCurrent );
 
     // Need to read the interrupt status register to clear the interrupt, otherwise it'll only trigger once
     i2c_burst_read( i2c, DT_REG_ADDR(DT_NODELABEL(ppg)), MAX30101_REG_INT_STS1, &buffer, sizeof(buffer) );
@@ -83,6 +88,7 @@ ErrCode_t PpgManager::init( void )
     }
 
     memset( dataBuffer, 0, sizeof(dataBuffer) );
+    memset( baselineCurrentBuffer, 0, sizeof(baselineCurrentBuffer) );
 
     // can't poll sensor in ISR, so need to create a work item to read the data and process it
     k_work_init( &ppgWorkItem, ppgWorkHandler );
@@ -177,7 +183,7 @@ float PpgManager::rollingAverage( float inNewSample )
     return sum / ( sizeof(dataBuffer)/sizeof(dataBuffer[0]) );
 }
 
-flaot PpgManager::calculateBaselineCurrent( float inNewSample )
+float PpgManager::calculateBaselineCurrent( float inNewSample )
 {
     // Shift all the old samples back one position
     for( int i = sizeof(baselineCurrentBuffer)/sizeof(baselineCurrentBuffer[0]) - 1; i > 0; i-- )
