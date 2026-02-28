@@ -35,6 +35,8 @@ void ppgWorkHandler( struct k_work *work )
     uint8_t buffer = {0};
     PpgManager::Instance().getSensorData( &data );
 
+    float ppgCurrent = ( ( float )data / ( ( 1 << ADC_RESOLUTION_BITS ) - 1 ) ) * MAX30101_FS_RANGE; // in nano amps
+
     // Need to read the interrupt status register to clear the interrupt, otherwise it'll only trigger once
     i2c_burst_read( i2c, DT_REG_ADDR(DT_NODELABEL(ppg)), MAX30101_REG_INT_STS1, &buffer, sizeof(buffer) );
 }

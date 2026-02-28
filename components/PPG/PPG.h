@@ -35,6 +35,20 @@
 
 #define MAX30101_INT_EN_BIT_A_FULL	( 1 << 7 )
 
+// ADC range in nano amps
+#if CONFIG_MAX30101_ADC_RGE == 0
+    #define MAX30101_FS_RANGE ( 2048.0f )
+#elif CONFIG_MAX30101_ADC_RGE == 1
+    #define MAX30101_FS_RANGE ( 4096.0f )
+#elif CONFIG_MAX30101_ADC_RGE == 2
+    #define MAX30101_FS_RANGE ( 8192.0f )
+#elif CONFIG_MAX30101_ADC_RGE == 3
+    #define MAX30101_FS_RANGE ( 16384.0f )
+#endif
+
+#define ADC_RESOLUTION_BITS ( 18 )
+
+
 class PpgManager
 {
 private:
