@@ -54,6 +54,10 @@ class PpgManager
 private:
     PpgManager( void ) = default;
     ~PpgManager( void ) = default;
+    float rollingAverage( float inNewSample );
+    float calculateBaselineCurrent( float inNewSample );
+    float dataBuffer[5]; // Will store the most recent 5 samples, used for calculating rolling average to smooth out the data
+    float baselineCurrentBuffer[100]; // Buffer to store the most recent 100 samples for calculating the baseline current, which can be used to detect if the sensor is not in contact with the skin
 public:
     static PpgManager& Instance( void ) { static PpgManager instance; return instance; }
     ErrCode_t init( void );

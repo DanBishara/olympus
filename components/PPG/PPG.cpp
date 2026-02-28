@@ -14,7 +14,7 @@
 
 #include "PPG.h"
 
-LOG_MODULE_REGISTER( PpgManager, CONFIG_LOG_DEFAULT_LEVEL );
+LOG_MODULE_REGISTER( PpgManager, LOG_LEVEL_INF );
 
 static struct k_work ppgWorkItem;
 
@@ -33,9 +33,13 @@ void ppgWorkHandler( struct k_work *work )
 {
     int data = 0;
     uint8_t buffer = {0};
+    int64_t timestamp = k_uptime_get();
     PpgManager::Instance().getSensorData( &data );
 
     float ppgCurrent = ( ( float )data / ( ( 1 << ADC_RESOLUTION_BITS ) - 1 ) ) * MAX30101_FS_RANGE; // in nano amps
+    // LOG_INF( "%ld %d %f", timestamp, data, ppgCurrent );
+    float smoothedCurrent = PpgManager::Instance().rollingAverage( ppgCurrent );
+    LOG_INF( "PPG Data: %d, Current: %f nA", data, ppgCurrent );
 
     // Need to read the interrupt status register to clear the interrupt, otherwise it'll only trigger once
     i2c_burst_read( i2c, DT_REG_ADDR(DT_NODELABEL(ppg)), MAX30101_REG_INT_STS1, &buffer, sizeof(buffer) );
@@ -77,6 +81,8 @@ ErrCode_t PpgManager::init( void )
         errCode = ErrCode_NotReady;
         goto exit;
     }
+
+    memset( dataBuffer, 0, sizeof(dataBuffer) );
 
     // can't poll sensor in ISR, so need to create a work item to read the data and process it
     k_work_init( &ppgWorkItem, ppgWorkHandler );
@@ -145,7 +151,47 @@ ErrCode_t PpgManager::getSensorData( int * outData )
 
     *outData = ppgData.val1;
 
+    LOG_INF( "PPG Data: %d", *outData );
+
     errCode = ErrCode_Success;
 exit:
     return errCode;
+}
+
+float PpgManager::rollingAverage( float inNewSample )
+{
+    // Shift all the old samples back one position
+    for( int i = sizeof(dataBuffer)/sizeof(dataBuffer[0]) - 1; i > 0; i-- )
+    {
+        dataBuffer[i] = dataBuffer[i-1];
+    }
+    // Add the new sample to the front of the buffer
+    dataBuffer[0] = inNewSample;
+
+    // Calculate the average of the samples in the buffer
+    float sum = 0;
+    for( int i = 0; i < sizeof(dataBuffer)/sizeof(dataBuffer[0]); i++ )
+    {
+        sum += dataBuffer[i];
+    }
+    return sum / ( sizeof(dataBuffer)/sizeof(dataBuffer[0]) );
+}
+
+flaot PpgManager::calculateBaselineCurrent( float inNewSample )
+{
+    // Shift all the old samples back one position
+    for( int i = sizeof(baselineCurrentBuffer)/sizeof(baselineCurrentBuffer[0]) - 1; i > 0; i-- )
+    {
+        baselineCurrentBuffer[i] = baselineCurrentBuffer[i-1];
+    }
+    // Add the new sample to the front of the buffer
+    baselineCurrentBuffer[0] = inNewSample;
+
+    // Calculate the average of the samples in the buffer
+    float sum = 0;
+    for( int i = 0; i < sizeof(baselineCurrentBuffer)/sizeof(baselineCurrentBuffer[0]); i++ )
+    {
+        sum += baselineCurrentBuffer[i];
+    }
+    return sum / ( sizeof(baselineCurrentBuffer)/sizeof(baselineCurrentBuffer[0]) );
 }
