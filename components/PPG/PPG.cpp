@@ -6,17 +6,18 @@
 * Datasheet: https://www.analog.com/media/en/technical-documentation/data-sheets/MAX30101.pdf
 */
 
-#include <zephyr/drivers/sensor.h>
-#include <zephyr/logging/log.h>
 #include <zephyr/drivers/gpio.h>
-#include <zephyr/kernel.h>
 #include <zephyr/drivers/i2c.h>
+#include <zephyr/drivers/sensor.h>
+#include <zephyr/kernel.h>
+#include <zephyr/logging/log.h>
 
 #include "PPG.h"
 
-LOG_MODULE_REGISTER( PpgManager, LOG_LEVEL_INF );
+LOG_MODULE_REGISTER( PpgManager, CONFIG_LOG_DEFAULT_LEVEL );
 
 static struct k_work ppgWorkItem;
+static struct gpio_callback irq_cb_data;
 
 const struct device *ppg = DEVICE_DT_GET_OR_NULL(DT_NODELABEL(ppg));
 const struct device *i2c = DEVICE_DT_GET_OR_NULL(DT_NODELABEL(i2c30));
@@ -26,13 +27,11 @@ static const struct gpio_dt_spec irq_pin =  GPIO_DT_SPEC_GET(DT_ALIAS(my_int), g
 static const struct gpio_dt_spec irq_pin = {0};
 #endif
 
-/* This structure holds the callback information for the kernel */
-static struct gpio_callback irq_cb_data;
-
+// @brief work handler for processing PPG data when an interrupt is triggered, will read the data from the sensor, calculate a rolling average and baseline current, and log the results
+// @param work pointer to the work item, not used in this handler but required by the k_work API
 void ppgWorkHandler( struct k_work *work )
 {
     int data = 0;
-    uint8_t buffer = {0};
     float ppgCurrent = 0; 
     float smoothedCurrent = 0;
     float baselineCurrent = 0;
@@ -46,10 +45,13 @@ void ppgWorkHandler( struct k_work *work )
     baselineCorrectedCurrent = ppgCurrent - baselineCurrent;
     LOG_INF( "PPG Data: %d, Current: %f nA, Smoothed: %f nA, Baseline: %f nA, Baseline Corrected: %f nA", data, ppgCurrent, smoothedCurrent, baselineCurrent, baselineCorrectedCurrent );
 
-    // Need to read the interrupt status register to clear the interrupt, otherwise it'll only trigger once
-    i2c_burst_read( i2c, DT_REG_ADDR(DT_NODELABEL(ppg)), MAX30101_REG_INT_STS1, &buffer, sizeof(buffer) );
+    PpgManager::Instance().clearInterruptStatus();
 }
 
+// @brief Submit work item to read and process PPG data, this is the interrupt handler for the MAX30101 interrupt pin, it will be triggered when new data is available to read from the sensor
+// @param port pointer to the GPIO device, not used in this handler but required by the GPIO API
+// @param cb pointer to the GPIO callback structure, not used in this handler but required by the GPIO API
+// @param pins bitmask of the pins that triggered the interrupt, not used in this handler but required by the GPIO API
 void max30101_interrupt_handler(const struct device *port, 
                                 struct gpio_callback *cb, 
                                 uint32_t pins)
@@ -59,12 +61,12 @@ void max30101_interrupt_handler(const struct device *port,
     k_work_submit( &ppgWorkItem );
 }
 
-// PPG is configured with an ADC resolution of 18 bits, so the max value is 2^18 - 1
+// @brief Initialize PpgManager instance, will configure the interrupt pin and enable the interrupt on the MAX30101
+// @return Error code
 ErrCode_t PpgManager::init( void )
 {
     ErrCode_t errCode = ErrCode_Internal;
     int zephyrCode = -ENOTSUP;
-    int data = 0;
 
     if( !device_is_ready( ppg ) ) 
     { 
@@ -118,10 +120,8 @@ ErrCode_t PpgManager::init( void )
     // Need to manually enable interrupt
     i2c_reg_write_byte( i2c, DT_REG_ADDR(DT_NODELABEL(ppg)), MAX30101_REG_INT_EN1, MAX30101_INT_EN_BIT_A_FULL );
 
-    LOG_INF( "MAX30101 Interrupt Initialized on P1.12" );
-
-    getSensorData( &data );
-    LOG_INF( "INIT PPG Data: %d", data );
+    clearInterruptStatus();
+    LOG_INF("PPG Init successful");
 
     errCode = ErrCode_Success;
 
@@ -129,6 +129,9 @@ exit:
     return errCode;
 }
 
+// @brief Read data from the MAX30101 sensor, this should only be called from the work handler when an interrupt is triggered, as it will read the data from the sensor which can take some time
+// @param outData pointer to an integer where the raw sensor data will be stored
+// @return Error code
 ErrCode_t PpgManager::getSensorData( int * outData )
 {
     ErrCode_t errCode = ErrCode_Internal;
@@ -164,6 +167,9 @@ exit:
     return errCode;
 }
 
+// @brief Calculate a rolling average of the PPG current, this is used to smooth out the data and reduce noise, it will store the most recent 5 samples and calculate the average of those samples
+// @param inNewSample the new sample to be added to the buffer and used in the average calculation
+// @return the rolling average of the samples in the buffer
 float PpgManager::rollingAverage( float inNewSample )
 {
     // Shift all the old samples back one position
@@ -183,6 +189,9 @@ float PpgManager::rollingAverage( float inNewSample )
     return sum / ( sizeof(dataBuffer)/sizeof(dataBuffer[0]) );
 }
 
+// @brief Calculate the baseline current of the PPG signal, this is used to detect if the sensor is not in contact with the skin, as the current will drop significantly when the sensor is not in contact, it will store the most recent 100 samples and calculate the average of those samples
+// @param inNewSample the new sample to be added to the buffer and used in the average calculation
+// @return the baseline current calculated from the samples in the buffer
 float PpgManager::calculateBaselineCurrent( float inNewSample )
 {
     // Shift all the old samples back one position
@@ -200,4 +209,11 @@ float PpgManager::calculateBaselineCurrent( float inNewSample )
         sum += baselineCurrentBuffer[i];
     }
     return sum / ( sizeof(baselineCurrentBuffer)/sizeof(baselineCurrentBuffer[0]) );
+}
+
+// @brief Clear the interrupt status of the MAX30101, this is necessary to allow new interrupts to be triggered, as the interrupt will only trigger once until the status is cleared
+void PpgManager::clearInterruptStatus( void )
+{
+    uint8_t buffer = {0};
+    i2c_burst_read( i2c, DT_REG_ADDR(DT_NODELABEL(ppg)), MAX30101_REG_INT_STS1, &buffer, sizeof(buffer) );
 }

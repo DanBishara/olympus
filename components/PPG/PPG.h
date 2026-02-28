@@ -62,4 +62,5 @@ public:
     ErrCode_t getSensorData( int * outData );
     float rollingAverage( float inNewSample );
     float calculateBaselineCurrent( float inNewSample );
+    void clearInterruptStatus( void );
 };
