@@ -117,6 +117,8 @@ ErrCode_t ImuManager::init( void )
     errCode = enableInterrupt();
     if( errCode ){ goto exit; }
 
+    LOG_INF( "IMU initialized!" );
+
     errCode = ErrCode_Success;
 exit:
     return errCode;

@@ -4,6 +4,8 @@
     aliases {
         led0 = &mcu_debug;
         my-int = &max30101_int;
+        boost-en = &boost_en;
+        boost-sel = &boost_sel;
     };
     leds {
 		compatible = "gpio-leds";
@@ -14,6 +16,16 @@
 			gpios = <&gpio1 10 GPIO_ACTIVE_HIGH>;
 			label = "MCU debug LED";
 		};
+
+        boost_en: boost_en {
+            gpios = <&gpio1 3 GPIO_ACTIVE_HIGH>;
+            label = "Boost enable";
+        };
+
+        boost_sel: boost_sel {
+            gpios = <&gpio1 2 GPIO_ACTIVE_HIGH>;
+            label = "Boost select";
+        };
 	};
     ppg_int {
         compatible = "gpio-keys";
@@ -21,6 +33,8 @@
             gpios = <&gpio1 11 (GPIO_PULL_UP | GPIO_ACTIVE_LOW)>;
         };
     };
+
+    
 };
 &gpiote30 {
     status = "okay";
@@ -38,7 +52,7 @@
     pinctrl-names = "default", "sleep";
 
 	accelerometer: lsm6dso@6a {
-        status = "disabled";
+        status = "okay";
 		compatible = "st,lsm6dso";
 		reg = <0x6a>;                   // 0x6a if SDO=0, use 0x6b if SDO=1
 		label = "LSM6DSOX";
