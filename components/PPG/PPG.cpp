@@ -55,7 +55,7 @@ void ppgWorkHandler( struct k_work *work )
     smoothedCurrent = PpgManager::Instance().rollingAverage( ppgCurrent );
     baselineCurrent = PpgManager::Instance().calculateBaselineCurrent( ppgCurrent );
     baselineCorrectedCurrent = ppgCurrent - baselineCurrent;
-    LOG_INF( "PPG Data: %d, Current: %f nA, Smoothed: %f nA, Baseline: %f nA, Baseline Corrected: %f nA", data, ppgCurrent, smoothedCurrent, baselineCurrent, baselineCorrectedCurrent );
+    LOG_DBG( "PPG Data: %d, Current: %f nA, Smoothed: %f nA, Baseline: %f nA, Baseline Corrected: %f nA", data, ppgCurrent, smoothedCurrent, baselineCurrent, baselineCorrectedCurrent );
 
     PpgManager::Instance().clearInterruptStatus();
 }
@@ -212,7 +212,7 @@ ErrCode_t PpgManager::getSensorData( int * outData )
 
     *outData = ppgData.val1;
 
-    LOG_INF( "PPG Data: %d", *outData );
+    LOG_DBG( "PPG Data: %d", *outData );
 
     errCode = ErrCode_Success;
 exit:
