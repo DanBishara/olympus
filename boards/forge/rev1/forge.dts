@@ -71,4 +71,11 @@
     };
 };
 
+&clock {
+    status = "okay";
+};
+
+&radio {
+    status = "okay";
+};
 

@@ -81,6 +81,12 @@ ErrCode_t PpgManager::init( void )
     int zephyrCode = -ENOTSUP;
     int data = 0;
 
+    if( !ppg )
+    {
+        LOG_ERR( "PPG disabled!" );
+        goto exit;
+    }
+
     if( !device_is_ready( ppg ) ) 
     { 
         LOG_ERR( "PPG not ready!" );
