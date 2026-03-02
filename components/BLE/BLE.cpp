@@ -71,7 +71,7 @@ static ssize_t read_test(struct bt_conn *conn,
 	                         sizeof(*data));
 }
 
-static void accel_ccc_cfg_changed(const struct bt_gatt_attr *attr,
+static void test_ccc_cfg_changed(const struct bt_gatt_attr *attr,
                                   uint16_t value)
 {
 	test_notify_enabled = (value == BT_GATT_CCC_NOTIFY);
@@ -83,7 +83,7 @@ BT_GATT_SERVICE_DEFINE( test_svc,
 	                       BT_GATT_CHRC_READ | BT_GATT_CHRC_NOTIFY,
 	                       BT_GATT_PERM_READ,
 	                       read_test, NULL, &test_data),
-	BT_GATT_CCC(test_notify_enabled,
+	BT_GATT_CCC(test_ccc_cfg_changed,
 	            BT_GATT_PERM_READ | BT_GATT_PERM_WRITE),
     );
 
