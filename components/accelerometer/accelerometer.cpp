@@ -24,7 +24,7 @@
 LOG_MODULE_REGISTER( ImuManager, CONFIG_LOG_DEFAULT_LEVEL );
 
 // TODO: The zephyr driver doesn't make use of the ML core, will likely need to add drivers for that if found to be useful
-const struct device *imu = DEVICE_DT_GET(DT_NODELABEL(accelerometer));
+const struct device *imu = DEVICE_DT_GET_OR_NULL(DT_NODELABEL(accelerometer));
 
 /// @brief Convert desired value to the sensor format require by zephyr
 /// @param inValue Value to be converter to sensor value
@@ -95,8 +95,14 @@ static void processAccelData(const struct device *dev, const struct sensor_trigg
 /// @return Error code
 ErrCode_t ImuManager::init( void )
 {
-    ErrCode_t errCode = ErrCode_Internal;
+    ErrCode_t errCode = ErrCode_NotInitialized;
     int zephyrCode = -ENOTSUP;
+
+    if( !imu )
+    {
+        LOG_ERR( "IMU disabled!" );
+        goto exit;
+    }
 
     if( !device_is_ready( imu ) ) 
     { 
@@ -110,6 +116,8 @@ ErrCode_t ImuManager::init( void )
 
     errCode = enableInterrupt();
     if( errCode ){ goto exit; }
+
+    LOG_INF( "IMU initialized!" );
 
     errCode = ErrCode_Success;
 exit:

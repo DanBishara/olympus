@@ -9,7 +9,8 @@
 
 typedef enum ErrCode_t
 {
-    ErrCode_Success     = 0,
-    ErrCode_Internal    = -1,
-    ErrCode_NotReady    = -2
+    ErrCode_Success         = 0,
+    ErrCode_Internal        = -1,
+    ErrCode_NotReady        = -2,
+    ErrCode_NotInitialized  = -3
 }ErrCode_t;

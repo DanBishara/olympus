@@ -6,18 +6,6 @@
     },
     "configurePresets": [
         {
-            "name": "build_53KIT_TES",
-            "displayName": "Build for nRF5340 DK nRF5340 application MCU Non Secure",
-            "generator": "Ninja",
-            "binaryDir": "${sourceDir}/build_53KIT_TES",
-            "cacheVariables": {
-                "BOARD": "nrf5340dk/nrf5340/cpuapp/ns",
-                "EXTRA_CONF_FILE": "boards/Devkits/53Devkit/sensor.conf",
-                "CONF_FILE": "prj.conf",
-                "EXTRA_DTC_OVERLAY_FILE": "boards/Devkits/53Devkit/sensor.dts;boards/Devkits/53Devkit/nrf5340dk.dts"
-            }
-        },
-        {
             "name": "build_54KIT",
             "displayName": "Build for nRF54l15 DK nRF54l15 Application",
             "generator": "Ninja",
@@ -27,6 +15,33 @@
                 "EXTRA_CONF_FILE": "boards/Devkits/54Devkit/sensor.conf",
                 "CONF_FILE": "prj.conf",
                 "EXTRA_DTC_OVERLAY_FILE": "boards/Devkits/54Devkit/nrf54l15dk.dts;boards/Devkits/54Devkit/sensor.dts",
+                "DEBUG_THREAD_INFO": false,
+                "olympus_DEBUG_THREAD_INFO": false
+            }
+        },
+        {
+            "name": "build_forge",
+            "displayName": "Build for rev1",
+            "generator": "Ninja",
+            "binaryDir": "${sourceDir}/build_forge",
+            "cacheVariables": {
+                "BOARD": "rev1/nrf54l15/cpuapp",
+                "EXTRA_CONF_FILE": "boards/forge/rev1/forge.conf",
+                "CONF_FILE": "prj.conf",
+                "EXTRA_DTC_OVERLAY_FILE": "boards/forge/rev1/forge.dts",
+                "DEBUG_THREAD_INFO": true,
+                "CONFIG_DEBUG_THREAD_INFO": true,
+                "BOARD_ROOT": "${sourceDir}/",
+                "olympus_DEBUG_THREAD_INFO": true
+            }
+        },
+        {
+            "name": "build_54KIT",
+            "displayName": "Build for nRF54l15 DK nRF54l15 Application",
+            "generator": "Ninja",
+            "binaryDir": "${sourceDir}/build_54KIT",
+            "cacheVariables": {
+                "BOARD": "nrf54l15dk/nrf54l15/cpuapp",
                 "DEBUG_THREAD_INFO": false,
                 "olympus_DEBUG_THREAD_INFO": false
             }
