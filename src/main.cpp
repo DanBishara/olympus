@@ -10,6 +10,7 @@
 #include "accelerometer.h"
 #include "LED.h"
 #include "PPG.h"
+#include "BLE.h"
 
 LOG_MODULE_REGISTER( main, CONFIG_LOG_DEFAULT_LEVEL );
 
@@ -18,12 +19,11 @@ int main(void)
     int data = 0;
     ImuManager::Instance().init();
     PpgManager::Instance().init();
+    BLEManager::Instance().init();
     DebugLEDManager::Instance().init();
     while(1)
     {
         DebugLEDManager::Instance().toggle();
-        PpgManager::Instance().getSensorData( &data );
-        LOG_INF( "PPG Data: %d", data );
         k_msleep(2000);
     }
 
