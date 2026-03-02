@@ -170,11 +170,10 @@ ErrCode_t PpgManager::init( void )
     gpio_add_callback( irq_pin.port, &irq_cb_data );
 
     // Need to manually enable interrupt
-    i2c_reg_write_byte( i2c, DT_REG_ADDR(DT_NODELABEL(ppg)), MAX30101_REG_INT_EN1, MAX30101_INT_EN_BIT_A_FULL );
+    i2c_reg_write_byte( i2c, DT_REG_ADDR(DT_NODELABEL(ppg)), MAX30101_REG_INT_EN1, MAX30101_INT_EN_BIT_A_FULL | MAX30101_INT_EN_BIT_PPG_RDY );
 
     clearInterruptStatus();
-    getSensorData( &data ); // read initial data to populate rolling average and baseline buffers
-    LOG_INF("PPG Init successful, initial data: %d", data);
+    LOG_INF("PPG Init successful");
 
     errCode = ErrCode_Success;
 
