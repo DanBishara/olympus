@@ -11,6 +11,7 @@
 #include "LED.h"
 #include "PPG.h"
 #include "BLE.h"
+#include "boost.h"
 
 LOG_MODULE_REGISTER( main, CONFIG_LOG_DEFAULT_LEVEL );
 
@@ -20,6 +21,7 @@ int main(void)
     ImuManager::Instance().init();
     PpgManager::Instance().init();
     BLEManager::Instance().init();
+    boostManager::Instance().init();
     DebugLEDManager::Instance().init();
     while(1)
     {

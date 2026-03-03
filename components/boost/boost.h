@@ -7,12 +7,18 @@
 
 #pragma once
 
+#include "errorCode.h"
+
 class boostManager
 {
 private:
     boostManager( void ) = default;
     ~boostManager( void ) = default;
 public:
-    void init( void );
+    ErrCode_t init( void );
+    void enableBoost( void );
+    void disableBoost( void );
+    void select5V( void );
+    void select3V( void );
     static boostManager& Instance( void ) { static boostManager instance; return instance; }
 }; 
