@@ -121,7 +121,9 @@ bool RingBuffer::peek( void *outData, uint8_t *outSize )
 {
     uint8_t  header                              = 0;
     uint32_t read                                = 0;
-    uint8_t  temp[ sizeof(uint8_t) + UINT8_MAX ] = { 0 };
+    // Use static to avoid allocating 256 bytes on the thread stack.
+    // Protected by bufMutex, so this is thread-safe.
+    static uint8_t temp[ sizeof(uint8_t) + UINT8_MAX ];
     bool     result                              = false;
 
     k_mutex_lock( &bufMutex, K_FOREVER );
