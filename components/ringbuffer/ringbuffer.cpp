@@ -59,14 +59,17 @@ bool RingBuffer::push( const void *inData, uint8_t inSize )
 // @return true on success, false if the buffer is empty
 bool RingBuffer::pop( void *outData, uint8_t *outSize )
 {
-    uint8_t header;
+    uint8_t  header  = 0;
+    uint32_t read    = 0;
 
-    if( ring_buf_get( &rb, &header, sizeof(uint8_t) ) != sizeof(uint8_t) )
+    read = ring_buf_get( &rb, &header, sizeof(uint8_t) );
+    if( read != sizeof(uint8_t) )
     {
         return false;
     }
 
-    if( ring_buf_get( &rb, static_cast<uint8_t *>( outData ), header ) != header )
+    read = ring_buf_get( &rb, static_cast<uint8_t *>( outData ), header );
+    if( read != header )
     {
         LOG_ERR( "pop: payload read failed after header consumed — buffer may be corrupt!" );
         return false;
@@ -78,39 +81,33 @@ bool RingBuffer::pop( void *outData, uint8_t *outSize )
 
 // @brief Peek at the next message without consuming it.
 //        Reads the header and payload but leaves both in the buffer.
+//        Uses ring_buf_peek which handles wrap-around internally.
 // @param outData   Destination for the payload bytes
 // @param outSize   Set to the number of bytes written into outData
-// @return true on success, false if the buffer is empty or the message wraps
-//         across the end of the internal buffer (call pop instead in that case)
+// @return true on success, false if the buffer is empty
 bool RingBuffer::peek( void *outData, uint8_t *outSize )
 {
-    uint8_t  header;
-    uint8_t *ptr;
+    uint8_t  header = 0;
+    uint32_t read = 0;
+    uint8_t  temp[ sizeof(uint8_t) + UINT8_MAX ] = { 0 };
 
-    // Claim a contiguous view of header + payload without consuming
-    uint32_t claimed = ring_buf_get_claim( &rb, &ptr, sizeof(uint8_t) );
-    if( claimed < sizeof(uint8_t) )
+    read = ring_buf_peek( &rb, &header, sizeof(uint8_t) );
+    if( read != sizeof(uint8_t) )
     {
-        ring_buf_get_finish( &rb, 0 );
         return false;
     }
 
-    header = ptr[0];
-
-    ring_buf_get_finish( &rb, 0 );
-
-    // Claim again for the full message to get the payload pointer
-    claimed = ring_buf_get_claim( &rb, &ptr, sizeof(uint8_t) + header );
-    if( claimed < (uint32_t)( sizeof(uint8_t) + header ) )
+    // ring_buf_peek always reads from position 0, so to skip the header byte
+    // we peek the full message (header + payload) into a temp buffer and copy
+    // just the payload out. ring_buf_peek handles wrap-around internally.
+    read = ring_buf_peek( &rb, temp, sizeof(uint8_t) + header );
+    if( read != (uint32_t)( sizeof(uint8_t) + header ) )
     {
-        ring_buf_get_finish( &rb, 0 );
-        LOG_WRN( "peek: message wraps internal buffer boundary, use pop instead" );
+        LOG_WRN( "peek: not enough data" );
         return false;
     }
 
-    memcpy( outData, ptr + sizeof(uint8_t), header );
-    ring_buf_get_finish( &rb, 0 );
-
+    memcpy( outData, temp + sizeof(uint8_t), header );
     *outSize = header;
     return true;
 }
