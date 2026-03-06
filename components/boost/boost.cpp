@@ -9,7 +9,7 @@
 
 #include "boost.h"
 
-LOG_MODULE_REGISTER( boostManager, CONFIG_LOG_DEFAULT_LEVEL );
+LOG_MODULE_REGISTER( BoostManager, CONFIG_LOG_DEFAULT_LEVEL );
 
 #if DT_NODE_HAS_STATUS(DT_ALIAS(boost_en), okay)
 static const struct gpio_dt_spec boost_en_pin =  GPIO_DT_SPEC_GET(DT_ALIAS(boost_en), gpios);
@@ -23,7 +23,7 @@ static const struct gpio_dt_spec boost_sel_pin =  GPIO_DT_SPEC_GET(DT_ALIAS(boos
 static const struct gpio_dt_spec boost_sel_pin = {0};
 #endif
 
-ErrCode_t boostManager::init( void )
+ErrCode_t BoostManager::init( void )
 {
     ErrCode_t errCode = ErrCode_Internal;
     int zephyrCode = -ENOTSUP;
@@ -50,16 +50,13 @@ ErrCode_t boostManager::init( void )
         goto exit;
     }
 
-    zephyrCode = gpio_pin_configure_dt( &boost_sel_pin, GPIO_OUTPUT_ACTIVE );
+    zephyrCode = gpio_pin_configure_dt( &boost_sel_pin, GPIO_OUTPUT_INACTIVE );
     if ( zephyrCode != 0 )
     {
         LOG_ERR( "Failed to configure GPIO pin!" );
         errCode = ErrCode_Internal;
         goto exit;
     }
-
-    select5V(); // default to 5V output
-    enableBoost(); // enable boost by default
 
     LOG_INF( "Boost converter initialized!" );
 
@@ -68,22 +65,22 @@ exit:
     return errCode;
 }
 
-void boostManager::enableBoost( void )
+void BoostManager::enableBoost( void )
 {
     gpio_pin_set_dt( &boost_en_pin, 1 );
 }
 
-void boostManager::disableBoost( void )
+void BoostManager::disableBoost( void )
 {
     gpio_pin_set_dt( &boost_en_pin, 0 );
 }
 
-void boostManager::select5V( void )
+void BoostManager::select5V( void )
 {
     gpio_pin_set_dt( &boost_sel_pin, 0 );
 } 
 
-void boostManager::select3V( void )
+void BoostManager::select3V( void )
 {
     gpio_pin_set_dt( &boost_sel_pin, 1 );
 }
