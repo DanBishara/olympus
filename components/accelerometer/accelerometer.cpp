@@ -10,6 +10,7 @@
 #include <zephyr/logging/log.h>
 
 #include "accelerometer.h"
+#include "stepCounter.h"
 
 #define MAX_SAMPLING_FREQ_HZ            ( 6664 )
 #define DEFAULT_SAMPLING_FREQUENCY_HZ   ( 12.5 ) // View datasheet for valid frequencies
@@ -89,6 +90,8 @@ static void processAccelData(const struct device *dev, const struct sensor_trigg
     convertToPhysicalValue( buffer, &z );
 
     LOG_DBG( "X: %f Y: %f Z: %f, in m/s2", x, y, z );
+
+    StepCounter::Instance().pushSample( x, y, z );
 }
 
 /// @brief Initialize ImuManager instance
