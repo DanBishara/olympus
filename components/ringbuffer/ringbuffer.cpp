@@ -31,8 +31,18 @@ LOG_MODULE_REGISTER( RingBuffer, CONFIG_LOG_DEFAULT_LEVEL );
 //        the buffer reaches 50% capacity so a waiting thread can be unblocked.
 // @param inBuffer        Pointer to the static byte array to use as storage
 // @param inCapacityBytes Size of inBuffer in bytes
-RingBuffer::RingBuffer( uint8_t *inBuffer, uint16_t inCapacityBytes ) : bufCapacity( inCapacityBytes )
+RingBuffer::RingBuffer( uint8_t *inBuffer, uint16_t inCapacityBytes )
 {
+    init( inBuffer, inCapacityBytes );
+}
+
+// @brief Initialize the ring buffer. Can be called on a default-constructed instance.
+//        Safe to call only once; re-initializing a live buffer is not supported.
+// @param inBuffer        Pointer to the static byte array to use as storage
+// @param inCapacityBytes Size of inBuffer in bytes
+void RingBuffer::init( uint8_t *inBuffer, uint16_t inCapacityBytes )
+{
+    bufCapacity = inCapacityBytes;
     ring_buf_init( &rb, inCapacityBytes, inBuffer );
     k_sem_init( &dataSem, 0, 1 );
     k_mutex_init( &bufMutex );

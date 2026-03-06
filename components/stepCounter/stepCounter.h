@@ -16,25 +16,28 @@
 class StepCounter
 {
 private:
-    StepCounter( void );
+    StepCounter( void ) = default;
     ~StepCounter( void ) = default;
 
-    RingBuffer      accelBuf;
+    RingBuffer      imuBuf;
     struct k_thread processingThread;
 
     uint32_t stepCount;
-    float    filteredMag;
-    bool     aboveThreshold;
+    float    filteredAccel;
+    float    filteredGyro;
+    bool     aboveAccelThreshold;
     int64_t  lastStepTimeMs;
 
     static void processingThreadFn( void *p1, void *p2, void *p3 );
     void        processLoop( void );
-    void        processUpdate( float x, float y, float z );
+    void        processUpdate( float ax, float ay, float az,
+                               float gx, float gy, float gz );
 
 public:
     static StepCounter& Instance( void ) { static StepCounter instance; return instance; }
     ErrCode_t init( void );
-    void      pushSample( float x, float y, float z );
+    void      pushSample( float ax, float ay, float az,
+                          float gx, float gy, float gz );
     uint32_t  getStepCount( void ) const;
     ErrCode_t reset( void );
 };

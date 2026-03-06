@@ -15,11 +15,14 @@
 class RingBuffer
 {
 public:
+    RingBuffer( void ) = default;
     RingBuffer( uint8_t *inBuffer, uint16_t inCapacityBytes );
     ~RingBuffer( void ) = default;
 
     RingBuffer( const RingBuffer& )            = delete;
     RingBuffer& operator=( const RingBuffer& ) = delete;
+
+    void init( uint8_t *inBuffer, uint16_t inCapacityBytes );
 
     bool     push( const void *inData, uint8_t inSize );
     bool     pop( void *outData, uint8_t *outSize );
@@ -36,5 +39,5 @@ private:
     struct ring_buf rb;
     struct k_sem    dataSem;
     struct k_mutex  bufMutex;
-    const uint16_t  bufCapacity;
+    uint16_t        bufCapacity;
 };
