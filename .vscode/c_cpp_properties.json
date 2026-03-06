@@ -1,0 +1,10 @@
+{
+    "configurations": [
+        {
+            "name": "Zephyr",
+            "compileCommands": "${workspaceFolder}/build_forge/olympus/compile_commands.json",
+            "intelliSenseMode": "gcc-arm"
+        }
+    ],
+    "version": 4
+}
