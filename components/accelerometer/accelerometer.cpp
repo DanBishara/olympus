@@ -18,6 +18,7 @@
 #define SENSOR_VALUE2_SCALE             ( 1000000 ) // val2 in sensor_value is the decimal portion * 10^6
 #define G_ACCEL_MS2                     ( 9.81 )
 #define DEFAULT_FULL_SCALE_MS2          ( 2 * G_ACCEL_MS2 )
+#define DEFAULT_GYRO_FULL_SCALE_DPS     ( 250.0f ) // ±250 dps covers arm swing (~1-3 rad/s = ~57-172 dps)
 #define TRIGGER_X_MS2                   ( 2 * G_ACCEL_MS2 ) // in m/(s^2)
 #define TRIGGER_Y_MS2                   ( 1 * G_ACCEL_MS2 ) // in m/(s^2)
 #define TRIGGER_Z_MS2                   ( 1 * G_ACCEL_MS2 ) // in m/(s^2)
@@ -132,22 +133,32 @@ exit:
 static void processAccelData(const struct device *dev, const struct sensor_trigger *trig)
 {
     struct sensor_value buffer;
-    float x, y, z;
+    float ax, ay, az;
+    float gx, gy, gz;
 
-    sensor_sample_fetch_chan(dev, SENSOR_CHAN_ACCEL_XYZ);
+    sensor_sample_fetch_chan(dev, SENSOR_CHAN_ALL);
 
-	sensor_channel_get(dev, SENSOR_CHAN_ACCEL_X, &buffer);
-    convertToPhysicalValue( buffer, &x );
+    sensor_channel_get(dev, SENSOR_CHAN_ACCEL_X, &buffer);
+    convertToPhysicalValue( buffer, &ax );
 
-	sensor_channel_get(dev, SENSOR_CHAN_ACCEL_Y, &buffer);
-    convertToPhysicalValue( buffer, &y );
+    sensor_channel_get(dev, SENSOR_CHAN_ACCEL_Y, &buffer);
+    convertToPhysicalValue( buffer, &ay );
 
-	sensor_channel_get(dev, SENSOR_CHAN_ACCEL_Z, &buffer);
-    convertToPhysicalValue( buffer, &z );
+    sensor_channel_get(dev, SENSOR_CHAN_ACCEL_Z, &buffer);
+    convertToPhysicalValue( buffer, &az );
 
-    LOG_DBG( "X: %f Y: %f Z: %f, in m/s2", x, y, z );
+    sensor_channel_get(dev, SENSOR_CHAN_GYRO_X, &buffer);
+    convertToPhysicalValue( buffer, &gx );
 
-    StepCounter::Instance().pushSample( x, y, z );
+    sensor_channel_get(dev, SENSOR_CHAN_GYRO_Y, &buffer);
+    convertToPhysicalValue( buffer, &gy );
+
+    sensor_channel_get(dev, SENSOR_CHAN_GYRO_Z, &buffer);
+    convertToPhysicalValue( buffer, &gz );
+
+    LOG_DBG( "Accel: %f %f %f m/s2 | Gyro: %f %f %f rad/s", ax, ay, az, gx, gy, gz );
+
+    StepCounter::Instance().pushSample( ax, ay, az, gx, gy, gz );
 }
 
 /// @brief Initialize ImuManager instance
@@ -171,6 +182,12 @@ ErrCode_t ImuManager::init( void )
     }
 
     errCode = setAccelFullScaleRange( DEFAULT_FULL_SCALE_MS2 );
+    if( errCode ){ goto exit; }
+
+    errCode = setGyroFullScaleRange( DEFAULT_GYRO_FULL_SCALE_DPS );
+    if( errCode ){ goto exit; }
+
+    errCode = setGyroSamplingFrequency( DEFAULT_SAMPLING_FREQUENCY_HZ );
     if( errCode ){ goto exit; }
 
     errCode = enableInterrupt();
