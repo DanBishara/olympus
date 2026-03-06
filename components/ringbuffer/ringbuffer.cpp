@@ -46,6 +46,7 @@ void RingBuffer::init( uint8_t *inBuffer, uint16_t inCapacityBytes )
     ring_buf_init( &rb, inCapacityBytes, inBuffer );
     k_sem_init( &dataSem, 0, 1 );
     k_mutex_init( &bufMutex );
+    initialized = true;
 }
 
 // @brief Write a message into the buffer, prefixed with a 1-byte size header.
@@ -59,8 +60,16 @@ bool RingBuffer::push( const void *inData, uint8_t inSize )
     uint16_t required = sizeof(uint8_t) + inSize;
     bool     result   = false;
     bool     doSignal = false;
+    bool     locked   = false;
+
+    if( !initialized )
+    {
+        LOG_ERR( "push: buffer not initialized!" );
+        goto exit;
+    }
 
     k_mutex_lock( &bufMutex, K_FOREVER );
+    locked = true;
 
     if( ring_buf_space_get( &rb ) < required )
     {
@@ -75,7 +84,10 @@ bool RingBuffer::push( const void *inData, uint8_t inSize )
     result   = true;
 
 exit:
-    k_mutex_unlock( &bufMutex );
+    if( locked )
+    {
+        k_mutex_unlock( &bufMutex );
+    }
 
     if( doSignal )
     {
@@ -97,8 +109,16 @@ bool RingBuffer::pop( void *outData, uint8_t *outSize )
     uint8_t  header = 0;
     uint32_t read   = 0;
     bool     result = false;
+    bool     locked = false;
+
+    if( !initialized )
+    {
+        LOG_ERR( "pop: buffer not initialized!" );
+        goto exit;
+    }
 
     k_mutex_lock( &bufMutex, K_FOREVER );
+    locked = true;
 
     read = ring_buf_get( &rb, &header, sizeof(uint8_t) );
     if( read != sizeof(uint8_t) )
@@ -117,7 +137,10 @@ bool RingBuffer::pop( void *outData, uint8_t *outSize )
     result   = true;
 
 exit:
-    k_mutex_unlock( &bufMutex );
+    if( locked )
+    {
+        k_mutex_unlock( &bufMutex );
+    }
     return result;
 }
 
@@ -135,8 +158,16 @@ bool RingBuffer::peek( void *outData, uint8_t *outSize )
     // Protected by bufMutex, so this is thread-safe.
     static uint8_t temp[ sizeof(uint8_t) + UINT8_MAX ];
     bool     result                              = false;
+    bool     locked                              = false;
+
+    if( !initialized )
+    {
+        LOG_ERR( "peek: buffer not initialized!" );
+        goto exit;
+    }
 
     k_mutex_lock( &bufMutex, K_FOREVER );
+    locked = true;
 
     read = ring_buf_peek( &rb, &header, sizeof(uint8_t) );
     if( read != sizeof(uint8_t) )
@@ -159,7 +190,10 @@ bool RingBuffer::peek( void *outData, uint8_t *outSize )
     result   = true;
 
 exit:
-    k_mutex_unlock( &bufMutex );
+    if( locked )
+    {
+        k_mutex_unlock( &bufMutex );
+    }
     return result;
 }
 
@@ -170,10 +204,17 @@ bool RingBuffer::getNextSize( uint8_t *outSize )
 {
     bool result = false;
 
+    if( !initialized )
+    {
+        LOG_ERR( "getNextSize: buffer not initialized!" );
+        goto exit;
+    }
+
     k_mutex_lock( &bufMutex, K_FOREVER );
     result = ring_buf_peek( &rb, outSize, sizeof(uint8_t) ) == sizeof(uint8_t);
     k_mutex_unlock( &bufMutex );
 
+exit:
     return result;
 }
 
@@ -184,7 +225,18 @@ bool RingBuffer::getNextSize( uint8_t *outSize )
 // @return true if signaled, false if timed out
 bool RingBuffer::waitForData( k_timeout_t inTimeout )
 {
-    return k_sem_take( &dataSem, inTimeout ) == 0;
+    bool result = false;
+
+    if( !initialized )
+    {
+        LOG_ERR( "waitForData: buffer not initialized!" );
+        goto exit;
+    }
+
+    result = k_sem_take( &dataSem, inTimeout ) == 0;
+
+exit:
+    return result;
 }
 
 // @brief Total bytes currently stored in the buffer (including headers)
@@ -192,17 +244,35 @@ uint16_t RingBuffer::size( void )
 {
     uint16_t result = 0;
 
+    if( !initialized )
+    {
+        LOG_ERR( "size: buffer not initialized!" );
+        goto exit;
+    }
+
     k_mutex_lock( &bufMutex, K_FOREVER );
     result = static_cast<uint16_t>( ring_buf_size_get( &rb ) );
     k_mutex_unlock( &bufMutex );
 
+exit:
     return result;
 }
 
 // @brief Total byte capacity the buffer was constructed with
 uint16_t RingBuffer::capacity( void ) const
 {
-    return bufCapacity;
+    uint16_t result = 0;
+
+    if( !initialized )
+    {
+        LOG_ERR( "capacity: buffer not initialized!" );
+        goto exit;
+    }
+
+    result = bufCapacity;
+
+exit:
+    return result;
 }
 
 // @brief Number of free bytes remaining
@@ -210,29 +280,52 @@ uint16_t RingBuffer::spaceAvailable( void )
 {
     uint16_t result = 0;
 
+    if( !initialized )
+    {
+        LOG_ERR( "spaceAvailable: buffer not initialized!" );
+        goto exit;
+    }
+
     k_mutex_lock( &bufMutex, K_FOREVER );
     result = static_cast<uint16_t>( ring_buf_space_get( &rb ) );
     k_mutex_unlock( &bufMutex );
 
+exit:
     return result;
 }
 
 // @brief True if the buffer contains no messages
 bool RingBuffer::isEmpty( void )
 {
-    bool result = false;
+    bool result = true;
+
+    if( !initialized )
+    {
+        LOG_ERR( "isEmpty: buffer not initialized!" );
+        goto exit;
+    }
 
     k_mutex_lock( &bufMutex, K_FOREVER );
     result = ring_buf_is_empty( &rb );
     k_mutex_unlock( &bufMutex );
 
+exit:
     return result;
 }
 
 // @brief Discard all data in the buffer
 void RingBuffer::clear( void )
 {
+    if( !initialized )
+    {
+        LOG_ERR( "clear: buffer not initialized!" );
+        goto exit;
+    }
+
     k_mutex_lock( &bufMutex, K_FOREVER );
     ring_buf_reset( &rb );
     k_mutex_unlock( &bufMutex );
+
+exit:
+    return;
 }
