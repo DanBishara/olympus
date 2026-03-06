@@ -12,7 +12,8 @@
 #include "accelerometer.h"
 #include "stepCounter.h"
 
-#define MAX_SAMPLING_FREQ_HZ            ( 6664 )
+#define MAX_ACCEL_SAMPLING_FREQ_HZ      ( 6664 )
+#define MAX_GYRO_SAMPLING_FREQ_HZ       ( 6664 )
 #define DEFAULT_SAMPLING_FREQUENCY_HZ   ( 12.5 ) // View datasheet for valid frequencies
 #define SENSOR_VALUE2_SCALE             ( 1000000 ) // val2 in sensor_value is the decimal portion * 10^6
 #define G_ACCEL_MS2                     ( 9.81 )
@@ -70,6 +71,61 @@ exit:
     return errCode;
 }
 
+/// @brief Set the full scale range for the given sensor channel
+/// @param inChannel Sensor channel (e.g. SENSOR_CHAN_ACCEL_XYZ, SENSOR_CHAN_GYRO_XYZ)
+/// @param inFullScaleRange Full scale range in the channel's native units
+/// @return Error code
+static ErrCode_t setFullScaleRange( enum sensor_channel inChannel, float inFullScaleRange )
+{
+    ErrCode_t errCode = ErrCode_Internal;
+    int zephyrCode = -ENOTSUP;
+    struct sensor_value fullScaleConfig;
+
+    errCode = convertToSensorValue( inFullScaleRange, &fullScaleConfig );
+    if( errCode ) { goto exit; }
+
+    zephyrCode = sensor_attr_set( imu, inChannel, SENSOR_ATTR_FULL_SCALE, &fullScaleConfig );
+    if( zephyrCode )
+    {
+        LOG_ERR( "Failed to set full scale range for channel %d!", inChannel );
+        errCode = ErrCode_Internal;
+        goto exit;
+    }
+
+    errCode = ErrCode_Success;
+exit:
+    return errCode;
+}
+
+/// @brief Set the sampling frequency for the given sensor channel
+/// @param inChannel Sensor channel (e.g. SENSOR_CHAN_ACCEL_XYZ, SENSOR_CHAN_GYRO_XYZ)
+/// @param inSamplingFrequency Sampling frequency in Hz
+/// @param inMaxFrequency Maximum allowed frequency for this channel in Hz
+/// @return Error code
+static ErrCode_t setSamplingFrequency( enum sensor_channel inChannel, uint16_t inSamplingFrequency, uint16_t inMaxFrequency )
+{
+    ErrCode_t errCode = ErrCode_Internal;
+    int zephyrCode = -ENOTSUP;
+    struct sensor_value samplingFrequencyConfig;
+
+    if( inSamplingFrequency > inMaxFrequency ){ inSamplingFrequency = inMaxFrequency; }
+
+    errCode = convertToSensorValue( inSamplingFrequency, &samplingFrequencyConfig );
+    if( errCode ) { goto exit; }
+
+    zephyrCode = sensor_attr_set( imu, inChannel, SENSOR_ATTR_SAMPLING_FREQUENCY, &samplingFrequencyConfig );
+    if( zephyrCode )
+    {
+        LOG_ERR( "Failed to set sampling frequency for channel %d!", inChannel );
+        errCode = ErrCode_Internal;
+        goto exit;
+    }
+
+    errCode = ErrCode_Success;
+exit:
+    return errCode;
+}
+
 /// @brief Interrupt triggered when accelerometer data is ready to be proessed
 /// @param dev Pointer to the device
 /// @param trig Sensor trigger data
@@ -107,14 +163,14 @@ ErrCode_t ImuManager::init( void )
         goto exit;
     }
 
-    if( !device_is_ready( imu ) ) 
-    { 
+    if( !device_is_ready( imu ) )
+    {
         LOG_ERR( "IMU not ready!" );
-        errCode = ErrCode_NotReady; 
-        goto exit; 
+        errCode = ErrCode_NotReady;
+        goto exit;
     }
 
-    errCode = setFullScaleRange( DEFAULT_FULL_SCALE_MS2 );
+    errCode = setAccelFullScaleRange( DEFAULT_FULL_SCALE_MS2 );
     if( errCode ){ goto exit; }
 
     errCode = enableInterrupt();
@@ -127,58 +183,36 @@ exit:
     return errCode;
 }
 
-/// @brief set the acceleromter full scale analog range in m/s2
-/// @param inFullScaleRange Full scale range in m/s2
+/// @brief Set the accelerometer full scale range in m/s²
+/// @param inFullScaleRange Full scale range in m/s²
 /// @return Error code
-ErrCode_t ImuManager::setFullScaleRange( float inFullScaleRange )
+ErrCode_t ImuManager::setAccelFullScaleRange( float inFullScaleRange )
 {
-    ErrCode_t errCode = ErrCode_Internal;
-    int zephyrCode = -ENOTSUP;
-    struct sensor_value fullScaleConfig;
-
-    errCode = convertToSensorValue( inFullScaleRange, &fullScaleConfig );
-    if( errCode ) { goto exit; }
-    
-    zephyrCode = sensor_attr_set( imu, SENSOR_CHAN_ACCEL_XYZ, SENSOR_ATTR_FULL_SCALE, &fullScaleConfig );
-
-    if( zephyrCode )
-    {
-        LOG_ERR( "Failed to set IMU full scale range!" );
-        errCode = ErrCode_Internal;
-        goto exit;
-    }
-
-    errCode = ErrCode_Success;
-exit:
-    return errCode;
+    return setFullScaleRange( SENSOR_CHAN_ACCEL_XYZ, inFullScaleRange );
 }
 
-/// @brief Set the sampling frequency of the accelerometer, can be set in the device tree
-/// @param inSamplingFrequency sampling frequency in Hz
+/// @brief Set the accelerometer sampling frequency in Hz
+/// @param inSamplingFrequency Sampling frequency in Hz
 /// @return Error code
-ErrCode_t ImuManager::setSamplingFrequency( uint16_t inSamplingFrequency )
+ErrCode_t ImuManager::setAccelSamplingFrequency( uint16_t inSamplingFrequency )
 {
-    ErrCode_t errCode = ErrCode_Internal;
-    int zephyrCode = -ENOTSUP;
-    struct sensor_value samplingFrequencyConfig;
+    return setSamplingFrequency( SENSOR_CHAN_ACCEL_XYZ, inSamplingFrequency, MAX_ACCEL_SAMPLING_FREQ_HZ );
+}
 
-    if( inSamplingFrequency > MAX_SAMPLING_FREQ_HZ ){ inSamplingFrequency = MAX_SAMPLING_FREQ_HZ; }
+/// @brief Set the gyroscope full scale range in degrees per second
+/// @param inFullScaleRange Full scale range in degrees per second
+/// @return Error code
+ErrCode_t ImuManager::setGyroFullScaleRange( float inFullScaleRange )
+{
+    return setFullScaleRange( SENSOR_CHAN_GYRO_XYZ, inFullScaleRange );
+}
 
-    errCode = convertToSensorValue( inSamplingFrequency, &samplingFrequencyConfig );
-    if( errCode ) { goto exit; }
-    
-    zephyrCode = sensor_attr_set( imu, SENSOR_CHAN_ACCEL_XYZ, SENSOR_ATTR_SAMPLING_FREQUENCY, &samplingFrequencyConfig );
-
-    if( zephyrCode )
-    {
-        LOG_ERR( "Failed to set IMU sampling frequency!" );
-        errCode = ErrCode_Internal;
-        goto exit;
-    }
-
-    errCode = ErrCode_Success;
-exit:
-    return errCode;
+/// @brief Set the gyroscope sampling frequency in Hz
+/// @param inSamplingFrequency Sampling frequency in Hz
+/// @return Error code
+ErrCode_t ImuManager::setGyroSamplingFrequency( uint16_t inSamplingFrequency )
+{
+    return setSamplingFrequency( SENSOR_CHAN_GYRO_XYZ, inSamplingFrequency, MAX_GYRO_SAMPLING_FREQ_HZ );
 }
 
 /// @brief Trigger an interrupt when data is ready to be processed
@@ -190,7 +224,7 @@ ErrCode_t ImuManager::enableInterrupt( void )
     int zephyrCode = -ENOTSUP;
     struct sensor_trigger trig;
 
-    errCode = setSamplingFrequency( DEFAULT_SAMPLING_FREQUENCY_HZ );
+    errCode = setAccelSamplingFrequency( DEFAULT_SAMPLING_FREQUENCY_HZ );
     if( errCode ) { goto exit; }
 
 	trig.type = SENSOR_TRIG_DATA_READY;

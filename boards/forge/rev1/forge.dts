@@ -62,6 +62,8 @@
         accel-range = <LSM6DSO_DT_FS_2G>;
         accel-odr = <LSM6DSO_DT_ODR_12Hz5>;
         gyro-pm = <LSM6DSO_DT_GY_NORMAL_MODE>;
+        gyro-odr = <LSM6DSO_DT_ODR_12Hz5>;
+        gyro-range = <LSM6DSO_DT_FS_250DPS>;
 	};
 
     ppg: max30101@57 {
