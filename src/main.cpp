@@ -21,7 +21,7 @@ int main(void)
     ImuManager::Instance().init();
     PpgManager::Instance().init();
     BLEManager::Instance().init();
-    boostManager::Instance().init();
+    BoostManager::Instance().init();
     DebugLEDManager::Instance().init();
     while(1)
     {
