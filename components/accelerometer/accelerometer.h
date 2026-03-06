@@ -20,6 +20,8 @@ private:
 public:
     static ImuManager& Instance( void ) { static ImuManager instance; return instance; }
     ErrCode_t init( void );
-    ErrCode_t setFullScaleRange ( float inFullScaleRange );
-    ErrCode_t setSamplingFrequency( uint16_t inSamplingFrequency );
+    ErrCode_t setAccelFullScaleRange( float inFullScaleRange );
+    ErrCode_t setAccelSamplingFrequency( uint16_t inSamplingFrequency );
+    ErrCode_t setGyroFullScaleRange( float inFullScaleRange );
+    ErrCode_t setGyroSamplingFrequency( uint16_t inSamplingFrequency );
 };
