@@ -5,6 +5,7 @@ project(olympus)
 
 target_include_directories(app PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/common)
 add_subdirectory(components/ringbuffer)
+add_subdirectory(components/stepCounter)
 add_subdirectory(components/accelerometer)
 add_subdirectory(components/LED)
 add_subdirectory(components/PPG)
