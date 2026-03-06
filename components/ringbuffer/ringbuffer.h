@@ -7,6 +7,7 @@
 
 #pragma once
 
+#include <zephyr/kernel.h>
 #include <zephyr/sys/ring_buffer.h>
 
 #include <stdint.h>
@@ -24,6 +25,7 @@ public:
     bool     pop( void *outData, uint8_t *outSize );
     bool     peek( void *outData, uint8_t *outSize );
     bool     getNextSize( uint8_t *outSize );
+    bool     waitForData( k_timeout_t inTimeout );
     uint16_t size( void );
     uint16_t capacity( void ) const;
     uint16_t spaceAvailable( void );
@@ -31,6 +33,8 @@ public:
     void     clear( void );
 
 private:
-    struct ring_buf    rb;
-    const uint16_t     bufCapacity;
+    struct ring_buf rb;
+    struct k_sem    dataSem;
+    struct k_mutex  bufMutex;
+    const uint16_t  bufCapacity;
 };
