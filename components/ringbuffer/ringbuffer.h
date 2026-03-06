@@ -40,4 +40,5 @@ private:
     struct k_sem    dataSem;
     struct k_mutex  bufMutex;
     uint16_t        bufCapacity;
+    bool            initialized;
 };
