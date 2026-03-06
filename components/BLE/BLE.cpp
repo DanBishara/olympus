@@ -13,6 +13,7 @@
 #include <zephyr/bluetooth/conn.h>
 
 #include "BLE.h"
+#include "stepCounter.h"
 
 #define DEVICE_NAME CONFIG_BT_DEVICE_NAME
 #define DEVICE_NAME_LEN (sizeof(DEVICE_NAME) - 1)
@@ -25,10 +26,9 @@ static const struct bt_data ad[] = {
     /* 1. Set Flags: General Discoverable + No BREDR (standard for BLE) */
     BT_DATA_BYTES(BT_DATA_FLAGS, (BT_LE_AD_GENERAL | BT_LE_AD_NO_BREDR)),
     
-    /* 2. Advertise your custom Accelerometer Service UUID */
-    BT_DATA_BYTES(BT_DATA_UUID128_ALL, 
-                  0x88, 0x77, 0x66, 0x55, 0x44, 0x33, 0x22, 0x11,
-                  0xFF, 0xEE, 0xDD, 0xCC, 0xAB, 0xAA, 0x00, 0x00),
+    /* 2. Advertise your custom Test Service UUID */
+    BT_DATA_BYTES(BT_DATA_UUID128_ALL,
+                  BT_UUID_128_ENCODE(0x88776655, 0x4433, 0x2211, 0xFFEE, 0xDDCCABAA0000)),
 };
 
 static struct bt_le_adv_param adv_param = BT_LE_ADV_PARAM_INIT(
@@ -48,13 +48,11 @@ static const struct bt_data sd[] = {
  * UUIDs generated arbitrarily for example purposes.
  */
 static struct bt_uuid_128 test_service_uuid = BT_UUID_INIT_128(
-	0x00, 0x00, 0xAA, 0xAB, 0xCC, 0xDD, 0xEE, 0xFF,
-	0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88
+    BT_UUID_128_ENCODE(0x88776655, 0x4433, 0x2211, 0xFFEE, 0xDDCCABAA0000)
 );
 
 static struct bt_uuid_128 test_char_uuid = BT_UUID_INIT_128(
-	0x00, 0x00, 0xAA, 0xAC, 0xCC, 0xDD, 0xEE, 0xFF,
-	0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88
+    BT_UUID_128_ENCODE(0x88776655, 0x4433, 0x2211, 0xFFEE, 0xDDCCACAA0000)
 );
 
 static uint32_t test_data = 0;
@@ -86,6 +84,37 @@ BT_GATT_SERVICE_DEFINE( test_svc,
 	BT_GATT_CCC(test_ccc_cfg_changed,
 	            BT_GATT_PERM_READ | BT_GATT_PERM_WRITE),
     );
+
+/*
+ * Step Counter Service
+ * Service UUID:        BB-AB base
+ * Characteristic UUID: BB-AC base
+ */
+static struct bt_uuid_128 step_counter_svc_uuid = BT_UUID_INIT_128(
+    BT_UUID_128_ENCODE(0x88776655, 0x4433, 0x2211, 0xFFEE, 0xDDCCABBB0000)
+);
+
+static struct bt_uuid_128 step_count_char_uuid = BT_UUID_INIT_128(
+    BT_UUID_128_ENCODE(0x88776655, 0x4433, 0x2211, 0xFFEE, 0xDDCCACBB0000)
+);
+
+static ssize_t read_step_count( struct bt_conn *conn,
+                                 const struct bt_gatt_attr *attr,
+                                 void *buf, uint16_t len,
+                                 uint16_t offset )
+{
+    uint32_t steps = StepCounter::Instance().getStepCount();
+    LOG_INF( "Read request for step count: %u", steps );
+    return bt_gatt_attr_read( conn, attr, buf, len, offset, &steps, sizeof(steps) );
+}
+
+BT_GATT_SERVICE_DEFINE( step_counter_svc,
+    BT_GATT_PRIMARY_SERVICE( &step_counter_svc_uuid ),
+    BT_GATT_CHARACTERISTIC( &step_count_char_uuid.uuid,
+                            BT_GATT_CHRC_READ,
+                            BT_GATT_PERM_READ,
+                            read_step_count, NULL, NULL ),
+);
 
 static void connected(struct bt_conn *conn, uint8_t err) {
     if (err) {
