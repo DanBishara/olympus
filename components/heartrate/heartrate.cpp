@@ -83,6 +83,13 @@ float HeartRateManager::calculateBaselineCurrent( float inNewSample )
     return sum / ( sizeof(baselineBuffer)/sizeof(baselineBuffer[0]) );
 }
 
+bool HeartRateManager::popBpm( float *outBpm )
+{
+    if ( !outBpm ) { return false; }
+    uint8_t size = sizeof( float );
+    return bpmBuffer.pop( outBpm, &size );
+}
+
 void HeartRateManager::pushSample( float sample )
 {
     if ( !isInit ) { LOG_ERR( "HeartRateManager not initialized!" ); return; }
@@ -170,6 +177,7 @@ ErrCode_t HeartRateManager::calculate( float *outBpm )
         float avgIntervalSeconds = avgIntervalSamples / sampleRate;
         *outBpm = 60.0f / avgIntervalSeconds;
 
+        bpmBuffer.push( outBpm, sizeof( float ) );
         LOG_INF( "Heart rate: %.1f BPM (%u peaks over %u samples)", *outBpm, peakCount, count );
     }
 
