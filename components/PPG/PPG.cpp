@@ -28,25 +28,19 @@ static const struct gpio_dt_spec irq_pin =  GPIO_DT_SPEC_GET(DT_ALIAS(my_int), g
 static const struct gpio_dt_spec irq_pin = {0};
 #endif
 
-// @brief work handler for processing PPG data when an interrupt is triggered, will read the data from the sensor, calculate a rolling average and baseline current, and log the results
+// @brief work handler for processing PPG data when an interrupt is triggered, will read the raw data from the sensor and push it to the HeartRateManager
 // @param work pointer to the work item, not used in this handler but required by the k_work API
 void ppgWorkHandler( struct k_work *work )
 {
     int data = 0;
-    float ppgCurrent = 0; 
-    float smoothedCurrent = 0;
-    float baselineCurrent = 0;
-    float baselineCorrectedCurrent = 0;
-    int64_t timestamp = k_uptime_get();
+    float ppgCurrent = 0;
+
     PpgManager::Instance().getSensorData( &data );
 
     ppgCurrent = ( ( float )data / ( ( 1 << ADC_RESOLUTION_BITS ) - 1 ) ) * MAX30101_FS_RANGE; // in nano amps
-    smoothedCurrent = PpgManager::Instance().rollingAverage( ppgCurrent );
-    baselineCurrent = PpgManager::Instance().calculateBaselineCurrent( ppgCurrent );
-    baselineCorrectedCurrent = ppgCurrent - baselineCurrent;
-    LOG_DBG( "PPG Data: %d, Current: %f nA, Smoothed: %f nA, Baseline: %f nA, Baseline Corrected: %f nA", data, ppgCurrent, smoothedCurrent, baselineCurrent, baselineCorrectedCurrent );
+    LOG_DBG( "PPG Data: %d, Current: %f nA", data, ppgCurrent );
 
-    HeartRateManager::Instance().pushSample( baselineCorrectedCurrent );
+    HeartRateManager::Instance().pushSample( ppgCurrent );
 
     PpgManager::Instance().clearInterruptStatus();
 }
@@ -98,9 +92,6 @@ ErrCode_t PpgManager::init( void )
         errCode = ErrCode_NotReady;
         goto exit;
     }
-
-    memset( dataBuffer, 0, sizeof(dataBuffer) );
-    memset( baselineCurrentBuffer, 0, sizeof(baselineCurrentBuffer) );
 
     // can't poll sensor in ISR, so need to create a work item to read the data and process it
     k_work_init( &ppgWorkItem, ppgWorkHandler );
@@ -175,50 +166,6 @@ ErrCode_t PpgManager::getSensorData( int * outData )
     errCode = ErrCode_Success;
 exit:
     return errCode;
-}
-
-// @brief Calculate a rolling average of the PPG current, this is used to smooth out the data and reduce noise, it will store the most recent 5 samples and calculate the average of those samples
-// @param inNewSample the new sample to be added to the buffer and used in the average calculation
-// @return the rolling average of the samples in the buffer
-float PpgManager::rollingAverage( float inNewSample )
-{
-    // Shift all the old samples back one position
-    for( int i = sizeof(dataBuffer)/sizeof(dataBuffer[0]) - 1; i > 0; i-- )
-    {
-        dataBuffer[i] = dataBuffer[i-1];
-    }
-    // Add the new sample to the front of the buffer
-    dataBuffer[0] = inNewSample;
-
-    // Calculate the average of the samples in the buffer
-    float sum = 0;
-    for( int i = 0; i < sizeof(dataBuffer)/sizeof(dataBuffer[0]); i++ )
-    {
-        sum += dataBuffer[i];
-    }
-    return sum / ( sizeof(dataBuffer)/sizeof(dataBuffer[0]) );
-}
-
-// @brief Calculate the baseline current of the PPG signal, this is used to detect if the sensor is not in contact with the skin, as the current will drop significantly when the sensor is not in contact, it will store the most recent 100 samples and calculate the average of those samples
-// @param inNewSample the new sample to be added to the buffer and used in the average calculation
-// @return the baseline current calculated from the samples in the buffer
-float PpgManager::calculateBaselineCurrent( float inNewSample )
-{
-    // Shift all the old samples back one position
-    for( int i = sizeof(baselineCurrentBuffer)/sizeof(baselineCurrentBuffer[0]) - 1; i > 0; i-- )
-    {
-        baselineCurrentBuffer[i] = baselineCurrentBuffer[i-1];
-    }
-    // Add the new sample to the front of the buffer
-    baselineCurrentBuffer[0] = inNewSample;
-
-    // Calculate the average of the samples in the buffer
-    float sum = 0;
-    for( int i = 0; i < sizeof(baselineCurrentBuffer)/sizeof(baselineCurrentBuffer[0]); i++ )
-    {
-        sum += baselineCurrentBuffer[i];
-    }
-    return sum / ( sizeof(baselineCurrentBuffer)/sizeof(baselineCurrentBuffer[0]) );
 }
 
 // @brief Clear the interrupt status of the MAX30101, this is necessary to allow new interrupts to be triggered, as the interrupt will only trigger once until the status is cleared
