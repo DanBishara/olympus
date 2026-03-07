@@ -19,6 +19,7 @@ jobs:
 
       - name: Initialize West
         run: |
+          pip3 install west
           west init -l app
           west update
           west zephyr-export
