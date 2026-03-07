@@ -6,6 +6,7 @@
         my-int = &max30101_int;
         boost-en = &boost_en;
         boost-sel = &boost_sel;
+        user-memory = &storage_partition;
     };
     leds {
 		compatible = "gpio-leds";
