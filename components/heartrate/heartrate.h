@@ -22,8 +22,12 @@ private:
     static constexpr uint16_t BUFFER_BYTES = 2000; // holds 500 float samples
     HeartRateManager( void ) : ppgBuffer( backingBuffer, BUFFER_BYTES ) {}
     ~HeartRateManager( void ) = default;
+    float rollingAverage( float inNewSample );
+    float calculateBaselineCurrent( float inNewSample );
     bool isInit = false;
     float sampleRate = 0.0f;
+    float smoothingBuffer[5] = {0};
+    float baselineBuffer[100] = {0};
     uint8_t backingBuffer[BUFFER_BYTES];
     RingBuffer ppgBuffer;
 };

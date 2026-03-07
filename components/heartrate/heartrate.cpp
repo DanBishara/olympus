@@ -38,6 +38,38 @@ exit:
     return errCode;
 }
 
+float HeartRateManager::rollingAverage( float inNewSample )
+{
+    for ( int i = sizeof(smoothingBuffer)/sizeof(smoothingBuffer[0]) - 1; i > 0; i-- )
+    {
+        smoothingBuffer[i] = smoothingBuffer[i - 1];
+    }
+    smoothingBuffer[0] = inNewSample;
+
+    float sum = 0;
+    for ( int i = 0; i < sizeof(smoothingBuffer)/sizeof(smoothingBuffer[0]); i++ )
+    {
+        sum += smoothingBuffer[i];
+    }
+    return sum / ( sizeof(smoothingBuffer)/sizeof(smoothingBuffer[0]) );
+}
+
+float HeartRateManager::calculateBaselineCurrent( float inNewSample )
+{
+    for ( int i = sizeof(baselineBuffer)/sizeof(baselineBuffer[0]) - 1; i > 0; i-- )
+    {
+        baselineBuffer[i] = baselineBuffer[i - 1];
+    }
+    baselineBuffer[0] = inNewSample;
+
+    float sum = 0;
+    for ( int i = 0; i < sizeof(baselineBuffer)/sizeof(baselineBuffer[0]); i++ )
+    {
+        sum += baselineBuffer[i];
+    }
+    return sum / ( sizeof(baselineBuffer)/sizeof(baselineBuffer[0]) );
+}
+
 void HeartRateManager::pushSample( float sample )
 {
     if ( !isInit ) { LOG_ERR( "HeartRateManager not initialized!" ); return; }
@@ -78,12 +110,23 @@ ErrCode_t HeartRateManager::calculate( float *outBpm )
     }
 
     {
+        // Apply rolling average then baseline correction to each sample
+        for ( uint16_t i = 0; i < count; i++ )
+        {
+            float smoothed  = rollingAverage( samples[i] );
+            float baseline  = calculateBaselineCurrent( samples[i] );
+            samples[i]      = smoothed - baseline;
+        }
+
         // Calculate mean for peak detection threshold
         float mean = 0.0f;
         for ( uint16_t i = 0; i < count; i++ ) { mean += samples[i]; }
         mean /= count;
 
-        // Find local maxima above mean
+        // Minimum samples between peaks based on 220 BPM physiological maximum
+        const uint16_t minPeakDistance = ( uint16_t )( sampleRate * 60.0f / 220.0f );
+
+        // Find local maxima above mean, enforcing minimum peak distance
         uint16_t peakCount = 0;
         uint16_t lastPeakIdx = 0;
         uint32_t peakIntervalSum = 0;
@@ -92,7 +135,8 @@ ErrCode_t HeartRateManager::calculate( float *outBpm )
         {
             if ( samples[i] > mean &&
                  samples[i] > samples[i - 1] &&
-                 samples[i] >= samples[i + 1] )
+                 samples[i] >= samples[i + 1] &&
+                 ( peakCount == 0 || ( i - lastPeakIdx ) >= minPeakDistance ) )
             {
                 if ( peakCount > 0 )
                 {
