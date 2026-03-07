@@ -13,6 +13,7 @@
 #include <zephyr/logging/log.h>
 
 #include "PPG.h"
+#include "heartrate.h"
 
 LOG_MODULE_REGISTER( PpgManager, CONFIG_LOG_DEFAULT_LEVEL );
 
@@ -44,6 +45,8 @@ void ppgWorkHandler( struct k_work *work )
     baselineCurrent = PpgManager::Instance().calculateBaselineCurrent( ppgCurrent );
     baselineCorrectedCurrent = ppgCurrent - baselineCurrent;
     LOG_DBG( "PPG Data: %d, Current: %f nA, Smoothed: %f nA, Baseline: %f nA, Baseline Corrected: %f nA", data, ppgCurrent, smoothedCurrent, baselineCurrent, baselineCorrectedCurrent );
+
+    HeartRateManager::Instance().pushSample( baselineCorrectedCurrent );
 
     PpgManager::Instance().clearInterruptStatus();
 }
