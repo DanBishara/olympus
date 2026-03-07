@@ -22,4 +22,5 @@ public:
 private:
     BoostManager( void ) = default;
     ~BoostManager( void ) = default;
+    bool isInit = false;
 };

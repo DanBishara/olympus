@@ -60,6 +60,7 @@ ErrCode_t BoostManager::init( void )
 
     LOG_INF( "Boost converter initialized!" );
 
+    isInit = true;
     errCode = ErrCode_Success;
 exit:
     return errCode;
@@ -67,20 +68,24 @@ exit:
 
 void BoostManager::enableBoost( void )
 {
+    if ( !isInit ) { LOG_ERR( "BoostManager not initialized!" ); return; }
     gpio_pin_set_dt( &boost_en_pin, 1 );
 }
 
 void BoostManager::disableBoost( void )
 {
+    if ( !isInit ) { LOG_ERR( "BoostManager not initialized!" ); return; }
     gpio_pin_set_dt( &boost_en_pin, 0 );
 }
 
 void BoostManager::select5V( void )
 {
+    if ( !isInit ) { LOG_ERR( "BoostManager not initialized!" ); return; }
     gpio_pin_set_dt( &boost_sel_pin, 0 );
-} 
+}
 
 void BoostManager::select3V( void )
 {
+    if ( !isInit ) { LOG_ERR( "BoostManager not initialized!" ); return; }
     gpio_pin_set_dt( &boost_sel_pin, 1 );
 }
