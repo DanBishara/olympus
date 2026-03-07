@@ -30,12 +30,25 @@ ErrCode_t HeartRateManager::init( float sampleRateHz )
 
     sampleRate = sampleRateHz;
 
+    k_thread_create( &thread, threadStack, 1024,
+                     threadFunc, NULL, NULL, NULL,
+                     K_PRIO_PREEMPT( 10 ), 0, K_NO_WAIT );
+
     LOG_INF( "HeartRateManager initialized at %.1f Hz", sampleRateHz );
 
     isInit = true;
     errCode = ErrCode_Success;
 exit:
     return errCode;
+}
+
+void HeartRateManager::threadFunc( void *p1, void *p2, void *p3 )
+{
+    while ( true )
+    {
+        k_sleep( K_MINUTES( 2 ) );
+        HeartRateManager::Instance().calculate( &HeartRateManager::Instance().lastBpm );
+    }
 }
 
 float HeartRateManager::rollingAverage( float inNewSample )
