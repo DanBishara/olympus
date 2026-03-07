@@ -27,18 +27,6 @@ static const struct gpio_dt_spec irq_pin =  GPIO_DT_SPEC_GET(DT_ALIAS(my_int), g
 static const struct gpio_dt_spec irq_pin = {0};
 #endif
 
-#if DT_NODE_HAS_STATUS(DT_ALIAS(boost_en), okay)
-static const struct gpio_dt_spec boost_en_pin =  GPIO_DT_SPEC_GET(DT_ALIAS(boost_en), gpios);
-#else
-static const struct gpio_dt_spec boost_en_pin = {0};
-#endif
-
-#if DT_NODE_HAS_STATUS(DT_ALIAS(boost_sel), okay)
-static const struct gpio_dt_spec boost_sel_pin =  GPIO_DT_SPEC_GET(DT_ALIAS(boost_sel), gpios);
-#else
-static const struct gpio_dt_spec boost_sel_pin = {0};
-#endif
-
 // @brief work handler for processing PPG data when an interrupt is triggered, will read the data from the sensor, calculate a rolling average and baseline current, and log the results
 // @param work pointer to the work item, not used in this handler but required by the k_work API
 void ppgWorkHandler( struct k_work *work )
@@ -108,20 +96,6 @@ ErrCode_t PpgManager::init( void )
         goto exit;
     }
 
-    if ( !gpio_is_ready_dt( &boost_en_pin ) )
-    {
-        LOG_ERR( "GPIO device %s is not ready!", boost_en_pin.port->name );
-        errCode = ErrCode_NotReady;
-        goto exit;
-    }
-
-    if ( !gpio_is_ready_dt( &boost_sel_pin ) )
-    {
-        LOG_ERR( "GPIO device %s is not ready!", boost_sel_pin.port->name );
-        errCode = ErrCode_NotReady;
-        goto exit;
-    }
-
     memset( dataBuffer, 0, sizeof(dataBuffer) );
     memset( baselineCurrentBuffer, 0, sizeof(baselineCurrentBuffer) );
 
@@ -136,25 +110,6 @@ ErrCode_t PpgManager::init( void )
         errCode = ErrCode_Internal;
         goto exit;
     }
-
-    zephyrCode = gpio_pin_configure_dt( &boost_en_pin, GPIO_OUTPUT_ACTIVE );
-    if ( zephyrCode != 0 )
-    {
-        LOG_ERR( "Failed to configure GPIO pin!" );
-        errCode = ErrCode_Internal;
-        goto exit;
-    }
-
-    zephyrCode = gpio_pin_configure_dt( &boost_sel_pin, GPIO_OUTPUT_ACTIVE );
-    if ( zephyrCode != 0 )
-    {
-        LOG_ERR( "Failed to configure GPIO pin!" );
-        errCode = ErrCode_Internal;
-        goto exit;
-    }
-
-    gpio_pin_set_dt( &boost_en_pin, 1 ); // enable boost converter for IR LED
-    gpio_pin_set_dt( &boost_sel_pin, 1 ); // set boost converter to
 
     /* Configure the interrupt trigger to falling edge */
     zephyrCode = gpio_pin_interrupt_configure_dt( &irq_pin, GPIO_INT_EDGE_FALLING );
