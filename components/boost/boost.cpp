@@ -28,6 +28,13 @@ ErrCode_t BoostManager::init( void )
     ErrCode_t errCode = ErrCode_Internal;
     int zephyrCode = -ENOTSUP;
 
+    if ( isInit )
+    {
+        LOG_WRN( "BoostManager already initialized!" );
+        errCode = ErrCode_Success;
+        goto exit;
+    }
+
     if ( !gpio_is_ready_dt( &boost_en_pin ) )
     {
         LOG_ERR( "GPIO device %s is not ready!", boost_en_pin.port->name );
