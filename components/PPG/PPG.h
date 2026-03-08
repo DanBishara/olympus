@@ -47,6 +47,24 @@
     #define MAX30101_FS_RANGE ( 16384.0f )
 #endif
 
+#if CONFIG_MAX30101_SR == 0
+    #define MAX30101_SR ( 50 )
+#elif CONFIG_MAX30101_SR == 1
+    #define MAX30101_SR ( 100 )
+#elif CONFIG_MAX30101_SR == 2
+    #define MAX30101_SR ( 200 )
+#elif CONFIG_MAX30101_SR == 3
+    #define MAX30101_SR ( 400 )
+#elif CONFIG_MAX30101_SR == 4
+    #define MAX30101_SR ( 800 )
+#elif CONFIG_MAX30101_SR == 5
+    #define MAX30101_SR ( 1000 )
+#elif CONFIG_MAX30101_SR == 6
+    #define MAX30101_SR ( 1600 )
+#elif CONFIG_MAX30101_SR == 7
+    #define MAX30101_SR ( 3200 )
+#endif
+
 #define ADC_RESOLUTION_BITS ( 18 )
 
 

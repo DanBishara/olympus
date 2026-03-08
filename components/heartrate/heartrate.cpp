@@ -103,7 +103,8 @@ bool HeartRateManager::popBpm( float *outBpm )
 void HeartRateManager::pushSample( float sample )
 {
     if ( !isInit ) { LOG_ERR( "HeartRateManager not initialized!" ); return; }
-    ppgBuffer->push( &sample, sizeof( float ) );
+    PpgSample ppgSample = { sample, k_uptime_get_32() };
+    ppgBuffer->push( &ppgSample, sizeof( PpgSample ) );
 }
 
 // @brief Calculate heart rate from buffered PPG samples using peak detection
@@ -113,8 +114,8 @@ ErrCode_t HeartRateManager::calculate( float *outBpm )
 {
     ErrCode_t errCode = ErrCode_Internal;
 
-    static constexpr uint16_t MAX_SAMPLES = 500;
-    static float samples[MAX_SAMPLES];
+    static constexpr uint16_t MAX_SAMPLES = HEARTRATE_BUFFER_BYTES / sizeof( PpgSample );
+    static PpgSample samples[MAX_SAMPLES];
     uint16_t count = 0;
 
     if ( !isInit ) { LOG_ERR( "HeartRateManager not initialized!" ); goto exit; }
@@ -128,7 +129,7 @@ ErrCode_t HeartRateManager::calculate( float *outBpm )
     // Drain ring buffer into local array
     while ( !ppgBuffer->isEmpty() && count < MAX_SAMPLES )
     {
-        uint8_t size = sizeof( float );
+        uint8_t size = sizeof( PpgSample );
         if ( !ppgBuffer->pop( &samples[count], &size ) ) { break; }
         count++;
     }
@@ -140,37 +141,39 @@ ErrCode_t HeartRateManager::calculate( float *outBpm )
     }
 
     {
-        // Apply rolling average then baseline correction to each sample
+        // Apply rolling average then baseline correction to each sample value in place
         for ( uint16_t i = 0; i < count; i++ )
         {
-            float smoothed  = rollingAverage( samples[i] );
-            float baseline  = calculateBaselineCurrent( samples[i] );
-            samples[i]      = smoothed - baseline;
+            float smoothed     = rollingAverage( samples[i].value );
+            float baseline     = calculateBaselineCurrent( samples[i].value );
+            samples[i].value   = smoothed - baseline;
         }
 
         // Calculate mean for peak detection threshold
         float mean = 0.0f;
-        for ( uint16_t i = 0; i < count; i++ ) { mean += samples[i]; }
+        for ( uint16_t i = 0; i < count; i++ ) { mean += samples[i].value; }
         mean /= count;
 
-        // Minimum samples between peaks based on 220 BPM physiological maximum
-        const uint16_t minPeakDistance = ( uint16_t )( sampleRate * 60.0f / 220.0f );
+        // Minimum time between peaks at physiological maximum of 220 BPM
+        static constexpr uint32_t MIN_PEAK_INTERVAL_MS = 60000U / 220U;
 
-        // Find local maxima above mean, enforcing minimum peak distance
+        // Find local maxima above mean, enforcing minimum peak interval by timestamp
         uint16_t peakCount = 0;
         uint16_t lastPeakIdx = 0;
-        uint32_t peakIntervalSum = 0;
+        uint32_t peakIntervalSumMs = 0;
 
         for ( uint16_t i = 1; i < count - 1; i++ )
         {
-            if ( samples[i] > mean &&
-                 samples[i] > samples[i - 1] &&
-                 samples[i] >= samples[i + 1] &&
-                 ( peakCount == 0 || ( i - lastPeakIdx ) >= minPeakDistance ) )
+            uint32_t intervalMs = samples[i].timestampMs - samples[lastPeakIdx].timestampMs;
+
+            if ( samples[i].value > mean &&
+                 samples[i].value > samples[i - 1].value &&
+                 samples[i].value >= samples[i + 1].value &&
+                 ( peakCount == 0 || intervalMs >= MIN_PEAK_INTERVAL_MS ) )
             {
                 if ( peakCount > 0 )
                 {
-                    peakIntervalSum += ( i - lastPeakIdx );
+                    peakIntervalSumMs += intervalMs;
                 }
                 lastPeakIdx = i;
                 peakCount++;
@@ -183,9 +186,8 @@ ErrCode_t HeartRateManager::calculate( float *outBpm )
             goto exit;
         }
 
-        float avgIntervalSamples = ( float )peakIntervalSum / ( peakCount - 1 );
-        float avgIntervalSeconds = avgIntervalSamples / sampleRate;
-        *outBpm = 60.0f / avgIntervalSeconds;
+        float avgIntervalMs = ( float )peakIntervalSumMs / ( peakCount - 1 );
+        *outBpm = 60000.0f / avgIntervalMs;
 
         bpmBuffer->push( outBpm, sizeof( float ) );
         LOG_INF( "Heart rate: %.1f BPM (%u peaks over %u samples)", *outBpm, peakCount, count );
