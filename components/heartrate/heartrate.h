@@ -12,9 +12,11 @@
 #include "errorCode.h"
 #include "ringbuffer.h"
 
-#define HEARTRATE_BUFFER_BYTES      20000 // holds 250 PpgSample structs (8 bytes each)
+// PPG ring buffer: 1250 PpgSamples (8 bytes each) = ~6.25 s at 200 Hz
+// Sized to hold at least 2 peak intervals at the minimum detectable rate (~30 BPM = 2 s/peak)
+#define HEARTRATE_BUFFER_BYTES      10000
 #define HEARTRATE_THREAD_STACK      1024
-#define HEARTRATE_BPM_BUFFER_BYTES  800   // holds 20 BPM measurements
+#define HEARTRATE_BPM_BUFFER_BYTES  80    // holds 20 BPM float readings
 
 struct PpgSample
 {
@@ -35,14 +37,14 @@ public:
 private:
     HeartRateManager( void ) = default;
     ~HeartRateManager( void ) = default;
-    float rollingAverage( float inNewSample );
-    float calculateBaselineCurrent( float inNewSample );
     static void threadFunc( void *p1, void *p2, void *p3 );
     bool isInit;
     float sampleRate;
     float lastBpm;
-    float smoothingBuffer[5];
-    float baselineBuffer[100];
+    float hpAlpha;      // IIR high-pass coefficient (DC blocker, ~0.5 Hz)
+    float lpAlpha;      // IIR low-pass coefficient (~4 Hz)
+    float dcEstimate;   // IIR high-pass state
+    float lpState;      // IIR low-pass state
     RingBuffer *ppgBuffer;
     RingBuffer *bpmBuffer;
     struct k_thread thread;
