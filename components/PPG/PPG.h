@@ -35,6 +35,7 @@
 
 #define MAX30101_INT_EN_BIT_A_FULL	( 1 << 7 )
 #define MAX30101_INT_EN_BIT_PPG_RDY	( 1 << 6 )
+#define MAX30101_MODE_HEART_RATE	( 1 << 1 )
 
 // ADC range in nano amps
 #if CONFIG_MAX30101_ADC_RGE == 0

@@ -67,7 +67,8 @@ ErrCode_t PpgManager::init( void )
 {
     ErrCode_t errCode = ErrCode_Internal;
     int zephyrCode = -ENOTSUP;
-    int data = 0;
+    uint8_t registerData = 0;
+    int interruptEnabled = 0;
 
     if( !ppg )
     {
@@ -126,6 +127,24 @@ ErrCode_t PpgManager::init( void )
 
     // Need to manually enable interrupt
     i2c_reg_write_byte( i2c, DT_REG_ADDR(DT_NODELABEL(ppg)), MAX30101_REG_INT_EN1, MAX30101_INT_EN_BIT_A_FULL | MAX30101_INT_EN_BIT_PPG_RDY );
+
+    i2c_reg_read_byte( i2c, DT_REG_ADDR(DT_NODELABEL(ppg)), MAX30101_REG_INT_EN1, &registerData );
+    LOG_INF( "MAX30101 Interrupt Enable Register: 0x%02X", registerData );
+    LOG_INF("Almost full interrupt: %s", ( registerData & MAX30101_INT_EN_BIT_A_FULL ) ? "Enabled" : "Disabled" );
+    LOG_INF("PPG ready interrupt: %s", ( registerData & MAX30101_INT_EN_BIT_PPG_RDY ) ? "Enabled" : "Disabled" );
+    i2c_reg_read_byte( i2c, DT_REG_ADDR(DT_NODELABEL(ppg)), MAX30101_REG_MODE_CFG, &registerData );
+    LOG_INF( "MAX30101 Mode Configuration Register: 0x%02X", registerData );
+    LOG_INF("Heart rate mode: %s", ( registerData & MAX30101_MODE_HEART_RATE ) ? "Enabled" : "Disabled" );
+    i2c_reg_read_byte( i2c, DT_REG_ADDR(DT_NODELABEL(ppg)), MAX30101_REG_LED1_PA, &registerData );
+    LOG_INF( "MAX30101 LED1 Power Amplifier Register: 0x%02X", registerData );
+    LOG_INF("LED1 Power: %f mA", ( ( float )registerData ) * 0.2 );
+    i2c_reg_read_byte( i2c, DT_REG_ADDR(DT_NODELABEL(ppg)), MAX30101_REG_INT_STS1, &registerData );
+    LOG_INF( "MAX30101 Interrupt Status Register 1: 0x%02X", registerData );
+`   LOG_INF("Almost full interrupt status: %s", ( registerData & MAX30101_INT_EN_BIT_A_FULL ) ? "Set" : "Not Set" );
+    LOG_INF("PPG ready interrupt status: %s", ( registerData & MAX30101_INT_EN_BIT_PPG_RDY ) ? "Set" : "Not Set" );
+
+    interruptEnabled = gpio_pin_get_dt( &irq_pin ); // Clear any pending interrupts by reading the pin state
+    LOG_INF( "MAX30101 Interrupt Pin State: %d", interruptEnabled );
 
     clearInterruptStatus();
     LOG_INF("PPG Init successful");
