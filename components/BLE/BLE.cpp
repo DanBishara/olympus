@@ -13,6 +13,7 @@
 #include <zephyr/bluetooth/conn.h>
 
 #include "BLE.h"
+#include "heartrate.h"
 
 #define DEVICE_NAME CONFIG_BT_DEVICE_NAME
 #define DEVICE_NAME_LEN (sizeof(DEVICE_NAME) - 1)
@@ -20,9 +21,23 @@
 LOG_MODULE_REGISTER( BLEManager, CONFIG_LOG_DEFAULT_LEVEL );
 
 static struct k_work_delayable bleWorkItem;
+static uint16_t current_mtu = 23; // BLE default ATT MTU
+
+static void on_att_mtu_updated(struct bt_conn *conn, uint16_t tx, uint16_t rx)
+{
+	current_mtu = MIN(tx, rx);
+	LOG_INF("MTU updated: tx=%d rx=%d (effective=%d)", tx, rx, current_mtu);
+}
+
+static struct bt_gatt_cb gatt_cb = {
+	.att_mtu_updated = on_att_mtu_updated,
+};
 
 #define TEST_SERVICE_UUID_VAL  BT_UUID_128_ENCODE(0x88776655, 0x4433, 0x2211, 0xFFEE, 0xDDCCABAA0000)
 #define TEST_CHAR_UUID_VAL     BT_UUID_128_ENCODE(0x88776655, 0x4433, 0x2211, 0xFFEE, 0xDDCCACAA0000)
+
+#define HR_SERVICE_UUID_VAL    BT_UUID_128_ENCODE(0x88776655, 0x4433, 0x2211, 0xFFEE, 0xDDCC02000000)
+#define HR_BPM_CHAR_UUID_VAL   BT_UUID_128_ENCODE(0x88776655, 0x4433, 0x2211, 0xFFEE, 0xDDCC02000001)
 
 static const struct bt_data ad[] = {
     BT_DATA_BYTES(BT_DATA_FLAGS, (BT_LE_AD_GENERAL | BT_LE_AD_NO_BREDR)),
@@ -41,12 +56,41 @@ static const struct bt_data sd[] = {
 	BT_DATA(BT_DATA_NAME_COMPLETE, DEVICE_NAME, DEVICE_NAME_LEN),
 };
 
-/*
- * Custom service/characteristic.
- * UUIDs generated arbitrarily for example purposes.
- */
 static struct bt_uuid_128 test_service_uuid = BT_UUID_INIT_128(TEST_SERVICE_UUID_VAL);
 static struct bt_uuid_128 test_char_uuid    = BT_UUID_INIT_128(TEST_CHAR_UUID_VAL);
+
+static struct bt_uuid_128 hr_service_uuid   = BT_UUID_INIT_128(HR_SERVICE_UUID_VAL);
+static struct bt_uuid_128 hr_bpm_char_uuid  = BT_UUID_INIT_128(HR_BPM_CHAR_UUID_VAL);
+
+// Drain all buffered BPM readings into the response payload
+static ssize_t read_hr_bpm( struct bt_conn *conn,
+                             const struct bt_gatt_attr *attr,
+                             void *buf, uint16_t len,
+                             uint16_t offset )
+{
+    static float bpmBatch[HEARTRATE_BPM_BUFFER_BYTES / sizeof(float)];
+    uint8_t count = 0;
+    float bpm;
+
+    while ( count < ARRAY_SIZE(bpmBatch) && HeartRateManager::Instance().popBpm(&bpm) )
+    {
+        bpmBatch[count++] = bpm;
+    }
+
+    // ATT Read Response header is 1 byte, so max payload = MTU - 1
+    uint16_t maxPayload = current_mtu - 1;
+    uint16_t dataLen = MIN( (uint16_t)(count * sizeof(float)), maxPayload );
+    LOG_INF( "HR read: %u BPM values", count );
+    return bt_gatt_attr_read( conn, attr, buf, len, offset, bpmBatch, dataLen );
+}
+
+BT_GATT_SERVICE_DEFINE( hr_svc,
+    BT_GATT_PRIMARY_SERVICE( &hr_service_uuid ),
+    BT_GATT_CHARACTERISTIC( &hr_bpm_char_uuid.uuid,
+                            BT_GATT_CHRC_READ,
+                            BT_GATT_PERM_READ,
+                            read_hr_bpm, NULL, NULL ),
+);
 
 static uint32_t test_data = 0;
 static bool test_notify_enabled;
@@ -81,9 +125,10 @@ BT_GATT_SERVICE_DEFINE( test_svc,
 static void connected(struct bt_conn *conn, uint8_t err) {
     if (err) {
         LOG_ERR("Connection failed (err %u)", err);
-    } else {
-        LOG_INF("Connected!");
+        return;
     }
+
+    LOG_INF( "Connected, MTU: %u bytes", bt_gatt_get_mtu( conn ) );
 }
 
 static void disconnected(struct bt_conn *conn, uint8_t reason) {
@@ -142,6 +187,8 @@ ErrCode_t BLEManager::init( void )
 {
     ErrCode_t errCode = ErrCode_Internal;
     int zephyrCode = -ENOTSUP;
+
+    bt_gatt_cb_register( &gatt_cb );
 
     zephyrCode = bt_enable(bt_ready);
     if( zephyrCode )
