@@ -11,6 +11,13 @@
 
 LOG_MODULE_REGISTER( HeartRateManager, CONFIG_LOG_DEFAULT_LEVEL );
 
+K_THREAD_STACK_DEFINE( heartrateThreadStack, HEARTRATE_THREAD_STACK );
+
+static uint8_t ppgBackingBuffer[HEARTRATE_BUFFER_BYTES];
+static uint8_t bpmBackingBuffer[HEARTRATE_BPM_BUFFER_BYTES];
+static RingBuffer ppgRingBuffer( ppgBackingBuffer, HEARTRATE_BUFFER_BYTES );
+static RingBuffer bpmRingBuffer( bpmBackingBuffer, HEARTRATE_BPM_BUFFER_BYTES );
+
 ErrCode_t HeartRateManager::init( float sampleRateHz )
 {
     ErrCode_t errCode = ErrCode_Internal;
@@ -28,9 +35,12 @@ ErrCode_t HeartRateManager::init( float sampleRateHz )
         goto exit;
     }
 
+    ppgBuffer = &ppgRingBuffer;
+    bpmBuffer = &bpmRingBuffer;
+
     sampleRate = sampleRateHz;
 
-    k_thread_create( &thread, threadStack, 1024,
+    k_thread_create( &thread, heartrateThreadStack, HEARTRATE_THREAD_STACK,
                      threadFunc, NULL, NULL, NULL,
                      K_PRIO_PREEMPT( 10 ), 0, K_NO_WAIT );
 
@@ -46,7 +56,7 @@ void HeartRateManager::threadFunc( void *p1, void *p2, void *p3 )
 {
     while ( true )
     {
-        k_sleep( K_MINUTES( 2 ) );
+        k_sleep( K_SECONDS( 3 ) );
         HeartRateManager::Instance().calculate( &HeartRateManager::Instance().lastBpm );
     }
 }
@@ -87,13 +97,13 @@ bool HeartRateManager::popBpm( float *outBpm )
 {
     if ( !outBpm ) { return false; }
     uint8_t size = sizeof( float );
-    return bpmBuffer.pop( outBpm, &size );
+    return bpmBuffer->pop( outBpm, &size );
 }
 
 void HeartRateManager::pushSample( float sample )
 {
     if ( !isInit ) { LOG_ERR( "HeartRateManager not initialized!" ); return; }
-    ppgBuffer.push( &sample, sizeof( float ) );
+    ppgBuffer->push( &sample, sizeof( float ) );
 }
 
 // @brief Calculate heart rate from buffered PPG samples using peak detection
@@ -116,10 +126,10 @@ ErrCode_t HeartRateManager::calculate( float *outBpm )
     }
 
     // Drain ring buffer into local array
-    while ( !ppgBuffer.isEmpty() && count < MAX_SAMPLES )
+    while ( !ppgBuffer->isEmpty() && count < MAX_SAMPLES )
     {
         uint8_t size = sizeof( float );
-        if ( !ppgBuffer.pop( &samples[count], &size ) ) { break; }
+        if ( !ppgBuffer->pop( &samples[count], &size ) ) { break; }
         count++;
     }
 
@@ -177,7 +187,7 @@ ErrCode_t HeartRateManager::calculate( float *outBpm )
         float avgIntervalSeconds = avgIntervalSamples / sampleRate;
         *outBpm = 60.0f / avgIntervalSeconds;
 
-        bpmBuffer.push( outBpm, sizeof( float ) );
+        bpmBuffer->push( outBpm, sizeof( float ) );
         LOG_INF( "Heart rate: %.1f BPM (%u peaks over %u samples)", *outBpm, peakCount, count );
     }
 

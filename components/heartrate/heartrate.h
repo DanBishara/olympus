@@ -12,9 +12,9 @@
 #include "errorCode.h"
 #include "ringbuffer.h"
 
-#define HEARTRATE_BUFFER_BYTES      ( 2000 ) // holds 500 float samples
-#define HEARTRATE_THREAD_STACK      ( 1024 )
-#define HEARTRATE_BPM_BUFFER_BYTES  ( 80 )   // holds 20 BPM measurements
+#define HEARTRATE_BUFFER_BYTES      2000 // holds 500 float samples
+#define HEARTRATE_THREAD_STACK      1024
+#define HEARTRATE_BPM_BUFFER_BYTES  80   // holds 20 BPM measurements
 
 class HeartRateManager
 {
@@ -27,21 +27,17 @@ public:
     bool      popBpm( float *outBpm );
 
 private:
-    HeartRateManager( void ) : ppgBuffer( backingBuffer, HEARTRATE_BUFFER_BYTES ),
-                               bpmBuffer( backingBpmBuffer, HEARTRATE_BPM_BUFFER_BYTES ) {}
+    HeartRateManager( void ) = default;
     ~HeartRateManager( void ) = default;
     float rollingAverage( float inNewSample );
     float calculateBaselineCurrent( float inNewSample );
     static void threadFunc( void *p1, void *p2, void *p3 );
-    bool isInit = false;
-    float sampleRate = 0.0f;
-    float lastBpm = 0.0f;
-    float smoothingBuffer[5] = {0};
-    float baselineBuffer[100] = {0};
-    uint8_t backingBuffer[HEARTRATE_BUFFER_BYTES];
-    uint8_t backingBpmBuffer[HEARTRATE_BPM_BUFFER_BYTES];
-    RingBuffer ppgBuffer;
-    RingBuffer bpmBuffer;
+    bool isInit;
+    float sampleRate;
+    float lastBpm;
+    float smoothingBuffer[5];
+    float baselineBuffer[100];
+    RingBuffer *ppgBuffer;
+    RingBuffer *bpmBuffer;
     struct k_thread thread;
-    K_THREAD_STACK_MEMBER( threadStack, HEARTRATE_THREAD_STACK );
 };

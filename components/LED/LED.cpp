@@ -106,7 +106,7 @@ ErrCode_t DebugLEDManager::toggle( void )
     ret = gpio_pin_toggle_dt( &led );
     if ( ret ) { goto exit; }
 
-    LOG_INF( "Toggling debug LED!" );
+    LOG_DBG( "Toggling debug LED!" );
 
     errCode = ErrCode_Success;
     
