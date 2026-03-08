@@ -9,6 +9,8 @@
 
 #include "heartrate.h"
 
+#define PI 3.14159265f
+
 LOG_MODULE_REGISTER( HeartRateManager, CONFIG_LOG_DEFAULT_LEVEL );
 
 K_THREAD_STACK_DEFINE( heartrateThreadStack, HEARTRATE_THREAD_STACK );
@@ -17,6 +19,8 @@ static uint8_t ppgBackingBuffer[HEARTRATE_BUFFER_BYTES];
 static uint8_t bpmBackingBuffer[HEARTRATE_BPM_BUFFER_BYTES];
 static RingBuffer ppgRingBuffer( ppgBackingBuffer, HEARTRATE_BUFFER_BYTES );
 static RingBuffer bpmRingBuffer( bpmBackingBuffer, HEARTRATE_BPM_BUFFER_BYTES );
+
+int numSamplesDropped = 0;
 
 ErrCode_t HeartRateManager::init( float sampleRateHz )
 {
@@ -38,7 +42,13 @@ ErrCode_t HeartRateManager::init( float sampleRateHz )
     ppgBuffer = &ppgRingBuffer;
     bpmBuffer = &bpmRingBuffer;
 
-    sampleRate = sampleRateHz;
+    sampleRate  = sampleRateHz;
+
+    // IIR bandpass: high-pass at 0.5 Hz (DC blocker) + low-pass at 4 Hz
+    hpAlpha    = 1.0f - ( 2.0f * PI * 0.5f / sampleRateHz );
+    lpAlpha    = ( 2.0f * PI * 4.0f ) / ( 2.0f * PI * 4.0f + sampleRateHz );
+    dcEstimate = 0.0f;
+    lpState    = 0.0f;
 
     k_thread_create( &thread, heartrateThreadStack, HEARTRATE_THREAD_STACK,
                      threadFunc, NULL, NULL, NULL,
@@ -56,42 +66,11 @@ void HeartRateManager::threadFunc( void *p1, void *p2, void *p3 )
 {
     while ( true )
     {
-        k_sleep( K_SECONDS( 3 ) );
+        k_sleep( K_SECONDS( 5 ) );
         HeartRateManager::Instance().calculate( &HeartRateManager::Instance().lastBpm );
     }
 }
 
-float HeartRateManager::rollingAverage( float inNewSample )
-{
-    for ( int i = sizeof(smoothingBuffer)/sizeof(smoothingBuffer[0]) - 1; i > 0; i-- )
-    {
-        smoothingBuffer[i] = smoothingBuffer[i - 1];
-    }
-    smoothingBuffer[0] = inNewSample;
-
-    float sum = 0;
-    for ( int i = 0; i < sizeof(smoothingBuffer)/sizeof(smoothingBuffer[0]); i++ )
-    {
-        sum += smoothingBuffer[i];
-    }
-    return sum / ( sizeof(smoothingBuffer)/sizeof(smoothingBuffer[0]) );
-}
-
-float HeartRateManager::calculateBaselineCurrent( float inNewSample )
-{
-    for ( int i = sizeof(baselineBuffer)/sizeof(baselineBuffer[0]) - 1; i > 0; i-- )
-    {
-        baselineBuffer[i] = baselineBuffer[i - 1];
-    }
-    baselineBuffer[0] = inNewSample;
-
-    float sum = 0;
-    for ( int i = 0; i < sizeof(baselineBuffer)/sizeof(baselineBuffer[0]); i++ )
-    {
-        sum += baselineBuffer[i];
-    }
-    return sum / ( sizeof(baselineBuffer)/sizeof(baselineBuffer[0]) );
-}
 
 bool HeartRateManager::popBpm( float *outBpm )
 {
@@ -104,7 +83,11 @@ void HeartRateManager::pushSample( float sample )
 {
     if ( !isInit ) { LOG_ERR( "HeartRateManager not initialized!" ); return; }
     PpgSample ppgSample = { sample, k_uptime_get_32() };
-    ppgBuffer->push( &ppgSample, sizeof( PpgSample ) );
+    if( !ppgBuffer->push( &ppgSample, sizeof( PpgSample ) ) )
+    {
+        numSamplesDropped++;
+
+    }
 }
 
 // @brief Calculate heart rate from buffered PPG samples using peak detection
@@ -134,6 +117,9 @@ ErrCode_t HeartRateManager::calculate( float *outBpm )
         count++;
     }
 
+    LOG_INF( "numsamples dropped since last calculation: %u", numSamplesDropped );
+    numSamplesDropped = 0;
+
     if ( count < 2 )
     {
         LOG_WRN( "Not enough samples to calculate heart rate (%u samples)", count );
@@ -141,12 +127,14 @@ ErrCode_t HeartRateManager::calculate( float *outBpm )
     }
 
     {
-        // Apply rolling average then baseline correction to each sample value in place
+        // IIR bandpass: stage 1 removes DC (~0.5 Hz HP), stage 2 removes HF noise (~4 Hz LP)
         for ( uint16_t i = 0; i < count; i++ )
         {
-            float smoothed     = rollingAverage( samples[i].value );
-            float baseline     = calculateBaselineCurrent( samples[i].value );
-            samples[i].value   = smoothed - baseline;
+            float raw      = samples[i].value;
+            dcEstimate     = hpAlpha * dcEstimate + ( 1.0f - hpAlpha ) * raw;
+            float acSignal = raw - dcEstimate;
+            lpState        = lpAlpha * acSignal + ( 1.0f - lpAlpha ) * lpState;
+            samples[i].value = lpState;
         }
 
         // Calculate mean for peak detection threshold
@@ -157,32 +145,43 @@ ErrCode_t HeartRateManager::calculate( float *outBpm )
         // Minimum time between peaks at physiological maximum of 220 BPM
         static constexpr uint32_t MIN_PEAK_INTERVAL_MS = 60000U / 220U;
 
-        // Find local maxima above mean, enforcing minimum peak interval by timestamp
+        // Peak detection with valley-crossing hysteresis.
+        // After accepting a peak the signal must drop back below the mean before
+        // the next peak can be considered. This prevents multiple detections on
+        // the same broad PPG pulse at high sample rates.
         uint16_t peakCount = 0;
         uint16_t lastPeakIdx = 0;
         uint32_t peakIntervalSumMs = 0;
+        bool lookingForPeak = true;
 
         for ( uint16_t i = 1; i < count - 1; i++ )
         {
-            uint32_t intervalMs = samples[i].timestampMs - samples[lastPeakIdx].timestampMs;
-
-            if ( samples[i].value > mean &&
-                 samples[i].value > samples[i - 1].value &&
-                 samples[i].value >= samples[i + 1].value &&
-                 ( peakCount == 0 || intervalMs >= MIN_PEAK_INTERVAL_MS ) )
+            if ( lookingForPeak )
             {
-                if ( peakCount > 0 )
+                if ( samples[i].value > mean &&
+                     samples[i].value >= samples[i - 1].value &&
+                     samples[i].value >= samples[i + 1].value )
                 {
-                    peakIntervalSumMs += intervalMs;
+                    uint32_t intervalMs = samples[i].timestampMs - samples[lastPeakIdx].timestampMs;
+                    if ( peakCount == 0 || intervalMs >= MIN_PEAK_INTERVAL_MS )
+                    {
+                        if ( peakCount > 0 ) { peakIntervalSumMs += intervalMs; }
+                        lastPeakIdx = i;
+                        peakCount++;
+                        lookingForPeak = false; // wait for valley before next peak
+                    }
                 }
-                lastPeakIdx = i;
-                peakCount++;
+            }
+            else
+            {
+                // Wait for signal to fall back below mean (valley crossing)
+                if ( samples[i].value < mean ) { lookingForPeak = true; }
             }
         }
 
         if ( peakCount < 2 )
         {
-            LOG_WRN( "Not enough peaks detected (%u peaks)", peakCount );
+            LOG_WRN( "Not enough peaks detected (%u peaks over %u samples)", peakCount, count );
             goto exit;
         }
 
