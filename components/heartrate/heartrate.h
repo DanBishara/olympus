@@ -12,9 +12,15 @@
 #include "errorCode.h"
 #include "ringbuffer.h"
 
-#define HEARTRATE_BUFFER_BYTES      2000 // holds 500 float samples
+#define HEARTRATE_BUFFER_BYTES      20000 // holds 250 PpgSample structs (8 bytes each)
 #define HEARTRATE_THREAD_STACK      1024
-#define HEARTRATE_BPM_BUFFER_BYTES  80   // holds 20 BPM measurements
+#define HEARTRATE_BPM_BUFFER_BYTES  800   // holds 20 BPM measurements
+
+struct PpgSample
+{
+    float    value;
+    uint32_t timestampMs;
+};
 
 class HeartRateManager
 {

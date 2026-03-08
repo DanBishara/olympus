@@ -12,6 +12,7 @@
 #include "PPG.h"
 #include "BLE.h"
 #include "boost.h"
+#include "heartrate.h"
 
 LOG_MODULE_REGISTER( main, CONFIG_LOG_DEFAULT_LEVEL );
 
@@ -22,6 +23,7 @@ int main(void)
     PpgManager::Instance().init();
     BLEManager::Instance().init();
     DebugLEDManager::Instance().init();
+    HeartRateManager::Instance().init( MAX30101_SR ); // 25 Hz sample rate for heart rate calculation
     while(1)
     {
         DebugLEDManager::Instance().toggle();
