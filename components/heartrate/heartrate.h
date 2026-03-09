@@ -40,6 +40,7 @@ private:
     HeartRateManager( void ) = default;
     ~HeartRateManager( void ) = default;
     static void threadFunc( void *p1, void *p2, void *p3 );
+    void applyBandpassFilter( PpgSample *samples, uint16_t count );
     bool isInit;
     float sampleRate;
     float lastBpm;

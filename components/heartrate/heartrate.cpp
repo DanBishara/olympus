@@ -106,6 +106,21 @@ void HeartRateManager::pushGreenLedSample( float sample )
     greenLedBuffer->push( &ppgSample, sizeof( PpgSample ) );
 }
 
+// @brief Apply IIR bandpass filter in-place to an array of PPG samples (HP at ~0.5 Hz, LP at ~4 Hz)
+// @param samples array of PpgSamples to filter
+// @param count number of samples
+void HeartRateManager::applyBandpassFilter( PpgSample *samples, uint16_t count )
+{
+    for ( uint16_t i = 0; i < count; i++ )
+    {
+        float raw      = samples[i].value;
+        dcEstimate     = hpAlpha * dcEstimate + ( 1.0f - hpAlpha ) * raw;
+        float acSignal = raw - dcEstimate;
+        lpState        = lpAlpha * acSignal + ( 1.0f - lpAlpha ) * lpState;
+        samples[i].value = lpState;
+    }
+}
+
 // @brief Calculate heart rate from buffered PPG samples using peak detection
 // @param outBpm pointer to store the calculated heart rate in BPM
 // @return Error code
@@ -114,7 +129,9 @@ ErrCode_t HeartRateManager::calculate( float *outBpm )
     ErrCode_t errCode = ErrCode_Internal;
 
     static constexpr uint16_t MAX_SAMPLES = HEARTRATE_BUFFER_BYTES / sizeof( PpgSample );
-    static PpgSample samples[MAX_SAMPLES];
+    static PpgSample redSamples[MAX_SAMPLES];
+    static PpgSample irSamples[MAX_SAMPLES];
+    static PpgSample greenSamples[MAX_SAMPLES];
     uint16_t count = 0;
 
     if ( !isInit ) { LOG_ERR( "HeartRateManager not initialized!" ); goto exit; }
@@ -125,11 +142,13 @@ ErrCode_t HeartRateManager::calculate( float *outBpm )
         goto exit;
     }
 
-    // Drain ring buffer into local array
-    while ( !redLedBuffer->isEmpty() && count < MAX_SAMPLES )
+    // Drain all three ring buffers into local arrays using the same count
+    while ( !redLedBuffer->isEmpty() && !irLedBuffer->isEmpty() && !greenLedBuffer->isEmpty() && count < MAX_SAMPLES )
     {
         uint8_t size = sizeof( PpgSample );
-        if ( !redLedBuffer->pop( &samples[count], &size ) ) { break; }
+        if ( !redLedBuffer->pop( &redSamples[count], &size ) )     { break; }
+        if ( !irLedBuffer->pop( &irSamples[count], &size ) )       { break; }
+        if ( !greenLedBuffer->pop( &greenSamples[count], &size ) ) { break; }
         count++;
     }
 
@@ -141,25 +160,19 @@ ErrCode_t HeartRateManager::calculate( float *outBpm )
     }
 
     {
-        // IIR bandpass: stage 1 removes DC (~0.5 Hz HP), stage 2 removes HF noise (~4 Hz LP)
-        for ( uint16_t i = 0; i < count; i++ )
-        {
-            float raw      = samples[i].value;
-            dcEstimate     = hpAlpha * dcEstimate + ( 1.0f - hpAlpha ) * raw;
-            float acSignal = raw - dcEstimate;
-            lpState        = lpAlpha * acSignal + ( 1.0f - lpAlpha ) * lpState;
-            samples[i].value = lpState;
-        }
+        applyBandpassFilter( redSamples, count );
+        applyBandpassFilter( irSamples, count );
+        applyBandpassFilter( greenSamples, count );
 
         // Calculate mean and stddev for adaptive peak detection threshold
         float mean = 0.0f;
-        for ( uint16_t i = 0; i < count; i++ ) { mean += samples[i].value; }
+        for ( uint16_t i = 0; i < count; i++ ) { mean += redSamples[i].value; }
         mean /= count;
 
         float variance = 0.0f;
         for ( uint16_t i = 0; i < count; i++ )
         {
-            float d = samples[i].value - mean;
+            float d = redSamples[i].value - mean;
             variance += d * d;
         }
         float threshold = mean + 0.3f * sqrtf( variance / count );
@@ -181,11 +194,11 @@ ErrCode_t HeartRateManager::calculate( float *outBpm )
         {
             if ( lookingForPeak )
             {
-                if ( samples[i].value > threshold &&
-                     samples[i].value >= samples[i - 1].value &&
-                     samples[i].value >= samples[i + 1].value )
+                if ( redSamples[i].value > threshold &&
+                     redSamples[i].value >= redSamples[i - 1].value &&
+                     redSamples[i].value >= redSamples[i + 1].value )
                 {
-                    uint32_t intervalMs = samples[i].timestampMs - samples[lastPeakIdx].timestampMs;
+                    uint32_t intervalMs = redSamples[i].timestampMs - redSamples[lastPeakIdx].timestampMs;
                     if ( peakCount == 0 || intervalMs >= MIN_PEAK_INTERVAL_MS )
                     {
                         if ( peakCount > 0 ) { peakIntervalSumMs += intervalMs; }
@@ -198,7 +211,7 @@ ErrCode_t HeartRateManager::calculate( float *outBpm )
             else
             {
                 // Wait for signal to fall back below threshold (valley crossing)
-                if ( samples[i].value < threshold ) { lookingForPeak = true; }
+                if ( redSamples[i].value < threshold ) { lookingForPeak = true; }
             }
         }
 
