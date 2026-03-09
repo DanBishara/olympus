@@ -175,6 +175,8 @@ void StepCounter::processUpdate( float ax, float ay, float az,
     bool accelPeak  = filteredAccel > STEP_ACCEL_THRESHOLD_MS2 && !aboveAccelThreshold;
     bool gyroActive = filteredGyro  > STEP_GYRO_THRESHOLD_RPS;
 
+    LOG_INF( "Accel: %.2f m/s² | Gyro: %.2f rad/s | StepCount: %u", filteredAccel, filteredGyro, stepCount );
+
     // Rising-edge detection: accel peak must coincide with active arm swing (gyro gate)
     if( accelPeak && gyroActive )
     {
@@ -183,7 +185,7 @@ void StepCounter::processUpdate( float ax, float ay, float az,
         {
             stepCount++;
             lastStepTimeMs = now;
-            LOG_DBG( "Step detected! Total: %u", stepCount );
+            LOG_INF( "Step detected! Total: %u", stepCount );
         }
     }
     else if( filteredAccel <= STEP_ACCEL_THRESHOLD_MS2 )

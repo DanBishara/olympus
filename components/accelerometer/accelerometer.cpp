@@ -156,7 +156,7 @@ static void processAccelData(const struct device *dev, const struct sensor_trigg
     sensor_channel_get(dev, SENSOR_CHAN_GYRO_Z, &buffer);
     convertToPhysicalValue( buffer, &gz );
 
-    LOG_DBG( "Accel: %f %f %f m/s2 | Gyro: %f %f %f rad/s", ax, ay, az, gx, gy, gz );
+    LOG_INF( "Accel: %f %f %f m/s2 | Gyro: %f %f %f rad/s", ax, ay, az, gx, gy, gz );
 
     StepCounter::Instance().pushSample( ax, ay, az, gx, gy, gz );
 }
@@ -181,14 +181,14 @@ ErrCode_t ImuManager::init( void )
         goto exit;
     }
 
-    errCode = setAccelFullScaleRange( DEFAULT_FULL_SCALE_MS2 );
-    if( errCode ){ goto exit; }
+    // errCode = setAccelFullScaleRange( DEFAULT_FULL_SCALE_MS2 );
+    // if( errCode ){ goto exit; }
 
-    errCode = setGyroFullScaleRange( DEFAULT_GYRO_FULL_SCALE_DPS );
-    if( errCode ){ goto exit; }
+    // errCode = setGyroFullScaleRange( DEFAULT_GYRO_FULL_SCALE_DPS );
+    // if( errCode ){ goto exit; }
 
-    errCode = setGyroSamplingFrequency( DEFAULT_SAMPLING_FREQUENCY_HZ );
-    if( errCode ){ goto exit; }
+    // errCode = setGyroSamplingFrequency( DEFAULT_SAMPLING_FREQUENCY_HZ );
+    // if( errCode ){ goto exit; }
 
     errCode = enableInterrupt();
     if( errCode ){ goto exit; }
