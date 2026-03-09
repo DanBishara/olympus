@@ -67,7 +67,7 @@
 	};
 
     ppg: max30101@57 {
-        status = "okay";
+    status = "disabled";
         compatible = "maxim,max30101";
         reg = <0x57>; // the datasheet says 0xae, but devboard said 0x57, may run into issues laters
     };

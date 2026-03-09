@@ -181,17 +181,17 @@ ErrCode_t ImuManager::init( void )
         goto exit;
     }
 
-    errCode = setAccelFullScaleRange( DEFAULT_FULL_SCALE_MS2 );
-    if( errCode ){ goto exit; }
+    // errCode = setAccelFullScaleRange( DEFAULT_FULL_SCALE_MS2 );
+    // if( errCode ){ LOG_INF( "Failed to set accelerometer full scale range!" ); goto exit; }
 
-    errCode = setGyroFullScaleRange( DEFAULT_GYRO_FULL_SCALE_DPS );
-    if( errCode ){ goto exit; }
+    // errCode = setGyroFullScaleRange( DEFAULT_GYRO_FULL_SCALE_DPS );
+    // if( errCode ){ LOG_INF( "Failed to set gyroscope full scale range!" ); goto exit; }
 
-    errCode = setGyroSamplingFrequency( DEFAULT_SAMPLING_FREQUENCY_HZ );
-    if( errCode ){ goto exit; }
+    // errCode = setGyroSamplingFrequency( DEFAULT_SAMPLING_FREQUENCY_HZ );
+    // if( errCode ){ LOG_INF( "Failed to set gyroscope sampling frequency!" ); goto exit; }
 
     errCode = enableInterrupt();
-    if( errCode ){ goto exit; }
+    if( errCode ){ LOG_INF( "Failed to enable IMU interrupt!" ); goto exit; }
 
     LOG_INF( "IMU initialized!" );
 
