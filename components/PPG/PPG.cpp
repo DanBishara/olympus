@@ -35,10 +35,11 @@ void ppgWorkHandler( struct k_work *work )
     int data = 0;
     float ppgCurrent = 0;
 
-    PpgManager::Instance().getRedData( &data );
-    ppgCurrent = ( ( float )data / ( ( 1 << ADC_RESOLUTION_BITS ) - 1 ) ) * MAX30101_FS_RANGE;
-    LOG_DBG( "Red LED: %d, Current: %f nA", data, ppgCurrent );
-    HeartRateManager::Instance().pushRedLedSample( ppgCurrent );
+    // Fetch all channels in one shot so IR and Green share the same hardware sample
+    if( PpgManager::Instance().fetchAllChannels() != ErrCode_Success )
+    {
+        return;
+    }
 
     PpgManager::Instance().getIrData( &data );
     ppgCurrent = ( ( float )data / ( ( 1 << ADC_RESOLUTION_BITS ) - 1 ) ) * MAX30101_FS_RANGE;
@@ -138,9 +139,28 @@ exit:
     return errCode;
 }
 
-// @brief Read data from the MAX30101 sensor for a specific LED channel
+// @brief Fetch a snapshot of all LED channels from the sensor simultaneously.
+//        Must be called once before any getRedData / getIrData / getGreenData call
+//        so that all three channels come from the same hardware sample.
+// @return Error code
+ErrCode_t PpgManager::fetchAllChannels( void )
+{
+    ErrCode_t errCode  = ErrCode_Internal;
+    int       zephyrCode = sensor_sample_fetch( ppg );
+    if( zephyrCode )
+    {
+        LOG_ERR( "Failed to fetch PPG sample!" );
+        goto exit;
+    }
+    errCode = ErrCode_Success;
+exit:
+    return errCode;
+}
+
+// @brief Read a previously-fetched channel value from the sensor driver cache.
+//        Call fetchAllChannels() first to ensure all channels share the same timestamp.
 // @param outData pointer to an integer where the raw sensor data will be stored
-// @param channel the LED channel to read from
+// @param channel the LED channel to read
 // @return Error code
 ErrCode_t PpgManager::getSensorData( int * outData, max30101_led_channel channel )
 {
@@ -165,13 +185,6 @@ ErrCode_t PpgManager::getSensorData( int * outData, max30101_led_channel channel
             goto exit;
     }
 
-    zephyrCode = sensor_sample_fetch_chan( ppg, sensorChan );
-    if( zephyrCode )
-    {
-        LOG_ERR( "Failed to fetch PPG sample!" );
-        goto exit;
-    }
-
     zephyrCode = sensor_channel_get( ppg, sensorChan, &ppgData );
     if( zephyrCode )
     {
@@ -180,7 +193,6 @@ ErrCode_t PpgManager::getSensorData( int * outData, max30101_led_channel channel
     }
 
     *outData = ppgData.val1;
-
     LOG_DBG( "PPG Data: %d", *outData );
 
     errCode = ErrCode_Success;

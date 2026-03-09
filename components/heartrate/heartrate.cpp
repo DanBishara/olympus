@@ -9,6 +9,7 @@
 #include <math.h>
 
 #include "heartrate.h"
+#include "ppg_processor.h"
 
 #define PI 3.14159265f
 
@@ -53,8 +54,8 @@ ErrCode_t HeartRateManager::init( float sampleRateHz )
     // IIR bandpass: high-pass at 0.5 Hz (DC blocker) + low-pass at 4 Hz
     hpAlpha    = 1.0f - ( 2.0f * PI * 0.5f / sampleRateHz );
     lpAlpha    = ( 2.0f * PI * 4.0f ) / ( 2.0f * PI * 4.0f + sampleRateHz );
-    dcEstimate = 0.0f;
-    lpState    = 0.0f;
+    greenFilter = { 0.0f, 0.0f };
+    irFilter    = { 0.0f, 0.0f };
 
     k_thread_create( &thread, heartrateThreadStack, HEARTRATE_THREAD_STACK,
                      threadFunc, NULL, NULL, NULL,
@@ -109,19 +110,19 @@ void HeartRateManager::pushGreenLedSample( float sample )
 // @brief Apply IIR bandpass filter in-place to an array of PPG samples (HP at ~0.5 Hz, LP at ~4 Hz)
 // @param samples array of PpgSamples to filter
 // @param count number of samples
-void HeartRateManager::applyBandpassFilter( PpgSample *samples, uint16_t count )
+void HeartRateManager::applyBandpassFilter( PpgSample *samples, uint16_t count, FilterState &state )
 {
     for ( uint16_t i = 0; i < count; i++ )
     {
-        float raw      = samples[i].value;
-        dcEstimate     = hpAlpha * dcEstimate + ( 1.0f - hpAlpha ) * raw;
-        float acSignal = raw - dcEstimate;
-        lpState        = lpAlpha * acSignal + ( 1.0f - lpAlpha ) * lpState;
-        samples[i].value = lpState;
+        float raw          = samples[i].value;
+        state.dcEstimate   = hpAlpha * state.dcEstimate + ( 1.0f - hpAlpha ) * raw;
+        float acSignal     = raw - state.dcEstimate;
+        state.lpState      = lpAlpha * acSignal + ( 1.0f - lpAlpha ) * state.lpState;
+        samples[i].value   = state.lpState;
     }
 }
 
-// @brief Calculate heart rate from buffered PPG samples using peak detection
+// @brief Calculate heart rate from IR and Green LED samples using process_ppg_data
 // @param outBpm pointer to store the calculated heart rate in BPM
 // @return Error code
 ErrCode_t HeartRateManager::calculate( float *outBpm )
@@ -129,9 +130,10 @@ ErrCode_t HeartRateManager::calculate( float *outBpm )
     ErrCode_t errCode = ErrCode_Internal;
 
     static constexpr uint16_t MAX_SAMPLES = HEARTRATE_BUFFER_BYTES / sizeof( PpgSample );
-    static PpgSample redSamples[MAX_SAMPLES];
-    static PpgSample irSamples[MAX_SAMPLES];
+    static PpgSample irSamples   [MAX_SAMPLES];
     static PpgSample greenSamples[MAX_SAMPLES];
+    static float     irFloats    [MAX_SAMPLES];
+    static float     greenFloats [MAX_SAMPLES];
     uint16_t count = 0;
 
     if ( !isInit ) { LOG_ERR( "HeartRateManager not initialized!" ); goto exit; }
@@ -142,16 +144,14 @@ ErrCode_t HeartRateManager::calculate( float *outBpm )
         goto exit;
     }
 
-    // Drain all three ring buffers into local arrays using the same count
-    while ( !redLedBuffer->isEmpty() && !irLedBuffer->isEmpty() && !greenLedBuffer->isEmpty() && count < MAX_SAMPLES )
+    // Drain IR and Green ring buffers into local arrays using the same count
+    while ( !irLedBuffer->isEmpty() && !greenLedBuffer->isEmpty() && count < MAX_SAMPLES )
     {
         uint8_t size = sizeof( PpgSample );
-        if ( !redLedBuffer->pop( &redSamples[count], &size ) )     { break; }
         if ( !irLedBuffer->pop( &irSamples[count], &size ) )       { break; }
         if ( !greenLedBuffer->pop( &greenSamples[count], &size ) ) { break; }
         count++;
     }
-
 
     if ( count < 2 )
     {
@@ -160,78 +160,33 @@ ErrCode_t HeartRateManager::calculate( float *outBpm )
     }
 
     {
-        applyBandpassFilter( redSamples, count );
-        applyBandpassFilter( irSamples, count );
-        applyBandpassFilter( greenSamples, count );
+        // Filter each channel independently using its own filter state
+        applyBandpassFilter( irSamples,    count, irFilter    );
+        applyBandpassFilter( greenSamples, count, greenFilter );
 
-        // Calculate mean and stddev for adaptive peak detection threshold
-        float mean = 0.0f;
-        for ( uint16_t i = 0; i < count; i++ ) { mean += redSamples[i].value; }
-        mean /= count;
+        // Power-of-2 windowing: take the most recent N samples where N is the
+        // largest power of 2 <= count, so process_ppg_data receives a valid FFT size
+        uint16_t fftCount = 1;
+        while ( ( fftCount << 1 ) <= count ) { fftCount <<= 1; }
+        uint16_t offset = count - fftCount;
 
-        float variance = 0.0f;
-        for ( uint16_t i = 0; i < count; i++ )
+        for ( uint16_t i = 0; i < fftCount; i++ )
         {
-            float d = redSamples[i].value - mean;
-            variance += d * d;
-        }
-        float threshold = mean + 0.3f * sqrtf( variance / count );
-        LOG_DBG( "Peak threshold: %.4f (mean=%.4f)", threshold, mean );
-
-        // Minimum time between peaks at physiological maximum of 220 BPM
-        static constexpr uint32_t MIN_PEAK_INTERVAL_MS = 60000U / 220U;
-
-        // Peak detection with valley-crossing hysteresis.
-        // After accepting a peak the signal must drop back below the threshold before
-        // the next peak can be considered. This prevents multiple detections on
-        // the same broad PPG pulse at high sample rates.
-        uint16_t peakCount = 0;
-        uint16_t lastPeakIdx = 0;
-        uint32_t peakIntervalSumMs = 0;
-        bool lookingForPeak = true;
-
-        for ( uint16_t i = 1; i < count - 1; i++ )
-        {
-            if ( lookingForPeak )
-            {
-                if ( redSamples[i].value > threshold &&
-                     redSamples[i].value >= redSamples[i - 1].value &&
-                     redSamples[i].value >= redSamples[i + 1].value )
-                {
-                    uint32_t intervalMs = redSamples[i].timestampMs - redSamples[lastPeakIdx].timestampMs;
-                    if ( peakCount == 0 || intervalMs >= MIN_PEAK_INTERVAL_MS )
-                    {
-                        if ( peakCount > 0 ) { peakIntervalSumMs += intervalMs; }
-                        lastPeakIdx = i;
-                        peakCount++;
-                        lookingForPeak = false; // wait for valley before next peak
-                    }
-                }
-            }
-            else
-            {
-                // Wait for signal to fall back below threshold (valley crossing)
-                if ( redSamples[i].value < threshold ) { lookingForPeak = true; }
-            }
+            irFloats[i]    = irSamples   [offset + i].value;
+            greenFloats[i] = greenSamples[offset + i].value;
         }
 
-        if ( peakCount < 2 )
-        {
-            LOG_WRN( "Not enough peaks detected (%u peaks over %u samples)", peakCount, count );
-            goto exit;
-        }
+        float confidence = 0.0f;
+        process_ppg_data( greenFloats, irFloats, fftCount, outBpm, &confidence );
 
-        float avgIntervalMs = ( float )peakIntervalSumMs / ( peakCount - 1 );
-        *outBpm = 60000.0f / avgIntervalMs;
-
-        if ( *outBpm < 40.0f || *outBpm > 180.0f )
+        if ( confidence <= 0.0f )
         {
-            LOG_WRN( "BPM out of physiological range: %.1f (discarding)", *outBpm );
+            LOG_WRN( "Low confidence (%.2f), discarding BPM %.1f", confidence, *outBpm );
             goto exit;
         }
 
         bpmBuffer->push( outBpm, sizeof( float ) );
-        LOG_INF( "Heart rate: %.1f BPM (%u peaks over %u samples)", *outBpm, peakCount, count );
+        LOG_INF( "Heart rate: %.1f BPM (confidence: %.2f, %u/%u samples used)", *outBpm, confidence, fftCount, count );
     }
 
     errCode = ErrCode_Success;

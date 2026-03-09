@@ -103,6 +103,7 @@ private:
 public:
     static PpgManager& Instance( void ) { static PpgManager instance; return instance; }
     ErrCode_t init( void );
+    ErrCode_t fetchAllChannels( void );
     ErrCode_t getRedData( int * outData );
     ErrCode_t getIrData( int * outData );
     ErrCode_t getGreenData( int * outData );

@@ -24,6 +24,12 @@ struct PpgSample
     uint32_t timestampMs;
 };
 
+struct FilterState
+{
+    float dcEstimate;
+    float lpState;
+};
+
 class HeartRateManager
 {
 public:
@@ -40,14 +46,14 @@ private:
     HeartRateManager( void ) = default;
     ~HeartRateManager( void ) = default;
     static void threadFunc( void *p1, void *p2, void *p3 );
-    void applyBandpassFilter( PpgSample *samples, uint16_t count );
+    void applyBandpassFilter( PpgSample *samples, uint16_t count, FilterState &state );
     bool isInit;
     float sampleRate;
     float lastBpm;
-    float hpAlpha;      // IIR high-pass coefficient (DC blocker, ~0.5 Hz)
-    float lpAlpha;      // IIR low-pass coefficient (~4 Hz)
-    float dcEstimate;   // IIR high-pass state
-    float lpState;      // IIR low-pass state
+    float hpAlpha;          // IIR high-pass coefficient (DC blocker, ~0.5 Hz)
+    float lpAlpha;          // IIR low-pass coefficient (~4 Hz)
+    FilterState greenFilter; // independent filter state for the Green LED channel
+    FilterState irFilter;    // independent filter state for the IR LED channel
     RingBuffer *redLedBuffer;
     RingBuffer *irLedBuffer;
     RingBuffer *greenLedBuffer;
