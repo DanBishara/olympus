@@ -23,7 +23,7 @@ int main(void)
     PpgManager::Instance().init();
     BLEManager::Instance().init();
     DebugLEDManager::Instance().init();
-    HeartRateManager::Instance().init( MAX30101_SR ); // 25 Hz sample rate for heart rate calculation
+    HeartRateManager::Instance().init( MAX30101_EFFECTIVE_SR );
     while(1)
     {
         DebugLEDManager::Instance().toggle();

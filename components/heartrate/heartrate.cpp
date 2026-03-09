@@ -6,6 +6,7 @@
 */
 
 #include <zephyr/logging/log.h>
+#include <math.h>
 
 #include "heartrate.h"
 
@@ -20,7 +21,6 @@ static uint8_t bpmBackingBuffer[HEARTRATE_BPM_BUFFER_BYTES];
 static RingBuffer ppgRingBuffer( ppgBackingBuffer, HEARTRATE_BUFFER_BYTES );
 static RingBuffer bpmRingBuffer( bpmBackingBuffer, HEARTRATE_BPM_BUFFER_BYTES );
 
-int numSamplesDropped = 0;
 
 ErrCode_t HeartRateManager::init( float sampleRateHz )
 {
@@ -83,11 +83,7 @@ void HeartRateManager::pushSample( float sample )
 {
     if ( !isInit ) { LOG_ERR( "HeartRateManager not initialized!" ); return; }
     PpgSample ppgSample = { sample, k_uptime_get_32() };
-    if( !ppgBuffer->push( &ppgSample, sizeof( PpgSample ) ) )
-    {
-        numSamplesDropped++;
-
-    }
+    ppgBuffer->push( &ppgSample, sizeof( PpgSample ) );
 }
 
 // @brief Calculate heart rate from buffered PPG samples using peak detection
@@ -117,8 +113,6 @@ ErrCode_t HeartRateManager::calculate( float *outBpm )
         count++;
     }
 
-    LOG_INF( "numsamples dropped since last calculation: %u", numSamplesDropped );
-    numSamplesDropped = 0;
 
     if ( count < 2 )
     {
@@ -137,16 +131,25 @@ ErrCode_t HeartRateManager::calculate( float *outBpm )
             samples[i].value = lpState;
         }
 
-        // Calculate mean for peak detection threshold
+        // Calculate mean and stddev for adaptive peak detection threshold
         float mean = 0.0f;
         for ( uint16_t i = 0; i < count; i++ ) { mean += samples[i].value; }
         mean /= count;
+
+        float variance = 0.0f;
+        for ( uint16_t i = 0; i < count; i++ )
+        {
+            float d = samples[i].value - mean;
+            variance += d * d;
+        }
+        float threshold = mean + 0.3f * sqrtf( variance / count );
+        LOG_DBG( "Peak threshold: %.4f (mean=%.4f)", threshold, mean );
 
         // Minimum time between peaks at physiological maximum of 220 BPM
         static constexpr uint32_t MIN_PEAK_INTERVAL_MS = 60000U / 220U;
 
         // Peak detection with valley-crossing hysteresis.
-        // After accepting a peak the signal must drop back below the mean before
+        // After accepting a peak the signal must drop back below the threshold before
         // the next peak can be considered. This prevents multiple detections on
         // the same broad PPG pulse at high sample rates.
         uint16_t peakCount = 0;
@@ -158,7 +161,7 @@ ErrCode_t HeartRateManager::calculate( float *outBpm )
         {
             if ( lookingForPeak )
             {
-                if ( samples[i].value > mean &&
+                if ( samples[i].value > threshold &&
                      samples[i].value >= samples[i - 1].value &&
                      samples[i].value >= samples[i + 1].value )
                 {
@@ -174,8 +177,8 @@ ErrCode_t HeartRateManager::calculate( float *outBpm )
             }
             else
             {
-                // Wait for signal to fall back below mean (valley crossing)
-                if ( samples[i].value < mean ) { lookingForPeak = true; }
+                // Wait for signal to fall back below threshold (valley crossing)
+                if ( samples[i].value < threshold ) { lookingForPeak = true; }
             }
         }
 
@@ -187,6 +190,12 @@ ErrCode_t HeartRateManager::calculate( float *outBpm )
 
         float avgIntervalMs = ( float )peakIntervalSumMs / ( peakCount - 1 );
         *outBpm = 60000.0f / avgIntervalMs;
+
+        if ( *outBpm < 40.0f || *outBpm > 180.0f )
+        {
+            LOG_WRN( "BPM out of physiological range: %.1f (discarding)", *outBpm );
+            goto exit;
+        }
 
         bpmBuffer->push( outBpm, sizeof( float ) );
         LOG_INF( "Heart rate: %.1f BPM (%u peaks over %u samples)", *outBpm, peakCount, count );

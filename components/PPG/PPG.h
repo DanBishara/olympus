@@ -65,6 +65,26 @@
     #define MAX30101_SR ( 3200 )
 #endif
 
+// Sample averaging factor: each output sample is the average of N internal samples,
+// so the effective sample rate delivered to the host is MAX30101_SR / MAX30101_SMP_AVE_FACTOR
+#if CONFIG_MAX30101_SMP_AVE == 0
+    #define MAX30101_SMP_AVE_FACTOR ( 1 )
+#elif CONFIG_MAX30101_SMP_AVE == 1
+    #define MAX30101_SMP_AVE_FACTOR ( 2 )
+#elif CONFIG_MAX30101_SMP_AVE == 2
+    #define MAX30101_SMP_AVE_FACTOR ( 4 )
+#elif CONFIG_MAX30101_SMP_AVE == 3
+    #define MAX30101_SMP_AVE_FACTOR ( 8 )
+#elif CONFIG_MAX30101_SMP_AVE == 4
+    #define MAX30101_SMP_AVE_FACTOR ( 16 )
+#elif CONFIG_MAX30101_SMP_AVE == 5
+    #define MAX30101_SMP_AVE_FACTOR ( 32 )
+#else
+    #define MAX30101_SMP_AVE_FACTOR ( 1 )
+#endif
+
+#define MAX30101_EFFECTIVE_SR ( MAX30101_SR / MAX30101_SMP_AVE_FACTOR )
+
 #define ADC_RESOLUTION_BITS ( 18 )
 
 
