@@ -35,7 +35,7 @@ void ppgWorkHandler( struct k_work *work )
     int data = 0;
     float ppgCurrent = 0;
 
-    PpgManager::Instance().getSensorData( &data );
+    PpgManager::Instance().getRedData( &data );
 
     ppgCurrent = ( ( float )data / ( ( 1 << ADC_RESOLUTION_BITS ) - 1 ) ) * MAX30101_FS_RANGE; // in nano amps
     LOG_DBG( "PPG Data: %d, Current: %f nA", data, ppgCurrent );
@@ -130,14 +130,16 @@ exit:
     return errCode;
 }
 
-// @brief Read data from the MAX30101 sensor, this should only be called from the work handler when an interrupt is triggered, as it will read the data from the sensor which can take some time
+// @brief Read data from the MAX30101 sensor for a specific LED channel
 // @param outData pointer to an integer where the raw sensor data will be stored
+// @param channel the LED channel to read from
 // @return Error code
-ErrCode_t PpgManager::getSensorData( int * outData )
+ErrCode_t PpgManager::getSensorData( int * outData, max30101_led_channel channel )
 {
     ErrCode_t errCode = ErrCode_Internal;
     int zephyrCode = -ENOTSUP;
     struct sensor_value ppgData;
+    enum sensor_channel sensorChan;
 
     if( !outData )
     {
@@ -145,14 +147,24 @@ ErrCode_t PpgManager::getSensorData( int * outData )
         goto exit;
     }
 
-    zephyrCode = sensor_sample_fetch_chan( ppg, SENSOR_CHAN_RED );
+    switch( channel )
+    {
+        case MAX30101_LED_CHANNEL_RED:   sensorChan = SENSOR_CHAN_RED;   break;
+        case MAX30101_LED_CHANNEL_IR:    sensorChan = SENSOR_CHAN_IR;    break;
+        case MAX30101_LED_CHANNEL_GREEN: sensorChan = SENSOR_CHAN_GREEN; break;
+        default:
+            LOG_ERR( "Invalid LED channel!" );
+            goto exit;
+    }
+
+    zephyrCode = sensor_sample_fetch_chan( ppg, sensorChan );
     if( zephyrCode )
     {
         LOG_ERR( "Failed to fetch PPG sample!" );
         goto exit;
     }
 
-    zephyrCode = sensor_channel_get( ppg, SENSOR_CHAN_RED, &ppgData );
+    zephyrCode = sensor_channel_get( ppg, sensorChan, &ppgData );
     if( zephyrCode )
     {
         LOG_ERR( "Failed to get PPG data!" );
@@ -166,6 +178,21 @@ ErrCode_t PpgManager::getSensorData( int * outData )
     errCode = ErrCode_Success;
 exit:
     return errCode;
+}
+
+ErrCode_t PpgManager::getRedData( int * outData )
+{
+    return getSensorData( outData, MAX30101_LED_CHANNEL_RED );
+}
+
+ErrCode_t PpgManager::getIrData( int * outData )
+{
+    return getSensorData( outData, MAX30101_LED_CHANNEL_IR );
+}
+
+ErrCode_t PpgManager::getGreenData( int * outData )
+{
+    return getSensorData( outData, MAX30101_LED_CHANNEL_GREEN );
 }
 
 // @brief Clear the interrupt status of the MAX30101, this is necessary to allow new interrupts to be triggered, as the interrupt will only trigger once until the status is cleared

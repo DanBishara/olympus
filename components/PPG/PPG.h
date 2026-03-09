@@ -87,15 +87,24 @@
 
 #define ADC_RESOLUTION_BITS ( 18 )
 
+enum max30101_led_channel {
+	MAX30101_LED_CHANNEL_RED	= 0,
+	MAX30101_LED_CHANNEL_IR,
+	MAX30101_LED_CHANNEL_GREEN,
+};
+
 
 class PpgManager
 {
 private:
     PpgManager( void ) = default;
     ~PpgManager( void ) = default;
+    ErrCode_t getSensorData( int * outData, max30101_led_channel channel );
 public:
     static PpgManager& Instance( void ) { static PpgManager instance; return instance; }
     ErrCode_t init( void );
-    ErrCode_t getSensorData( int * outData );
+    ErrCode_t getRedData( int * outData );
+    ErrCode_t getIrData( int * outData );
+    ErrCode_t getGreenData( int * outData );
     void clearInterruptStatus( void );
 };
