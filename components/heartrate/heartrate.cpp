@@ -16,9 +16,13 @@ LOG_MODULE_REGISTER( HeartRateManager, CONFIG_LOG_DEFAULT_LEVEL );
 
 K_THREAD_STACK_DEFINE( heartrateThreadStack, HEARTRATE_THREAD_STACK );
 
-static uint8_t ppgBackingBuffer[HEARTRATE_BUFFER_BYTES];
+static uint8_t redLedBackingBuffer[HEARTRATE_BUFFER_BYTES];
+static uint8_t irLedBackingBuffer[HEARTRATE_BUFFER_BYTES];
+static uint8_t greenLedBackingBuffer[HEARTRATE_BUFFER_BYTES];
 static uint8_t bpmBackingBuffer[HEARTRATE_BPM_BUFFER_BYTES];
-static RingBuffer ppgRingBuffer( ppgBackingBuffer, HEARTRATE_BUFFER_BYTES );
+static RingBuffer redLedRingBuffer( redLedBackingBuffer, HEARTRATE_BUFFER_BYTES );
+static RingBuffer irLedRingBuffer( irLedBackingBuffer, HEARTRATE_BUFFER_BYTES );
+static RingBuffer greenLedRingBuffer( greenLedBackingBuffer, HEARTRATE_BUFFER_BYTES );
 static RingBuffer bpmRingBuffer( bpmBackingBuffer, HEARTRATE_BPM_BUFFER_BYTES );
 
 
@@ -39,8 +43,10 @@ ErrCode_t HeartRateManager::init( float sampleRateHz )
         goto exit;
     }
 
-    ppgBuffer = &ppgRingBuffer;
-    bpmBuffer = &bpmRingBuffer;
+    redLedBuffer   = &redLedRingBuffer;
+    irLedBuffer    = &irLedRingBuffer;
+    greenLedBuffer = &greenLedRingBuffer;
+    bpmBuffer      = &bpmRingBuffer;
 
     sampleRate  = sampleRateHz;
 
@@ -79,11 +85,25 @@ bool HeartRateManager::popBpm( float *outBpm )
     return bpmBuffer->pop( outBpm, &size );
 }
 
-void HeartRateManager::pushSample( float sample )
+void HeartRateManager::pushRedLedSample( float sample )
 {
     if ( !isInit ) { LOG_ERR( "HeartRateManager not initialized!" ); return; }
     PpgSample ppgSample = { sample, k_uptime_get_32() };
-    ppgBuffer->push( &ppgSample, sizeof( PpgSample ) );
+    redLedBuffer->push( &ppgSample, sizeof( PpgSample ) );
+}
+
+void HeartRateManager::pushIrLedSample( float sample )
+{
+    if ( !isInit ) { LOG_ERR( "HeartRateManager not initialized!" ); return; }
+    PpgSample ppgSample = { sample, k_uptime_get_32() };
+    irLedBuffer->push( &ppgSample, sizeof( PpgSample ) );
+}
+
+void HeartRateManager::pushGreenLedSample( float sample )
+{
+    if ( !isInit ) { LOG_ERR( "HeartRateManager not initialized!" ); return; }
+    PpgSample ppgSample = { sample, k_uptime_get_32() };
+    greenLedBuffer->push( &ppgSample, sizeof( PpgSample ) );
 }
 
 // @brief Calculate heart rate from buffered PPG samples using peak detection
@@ -106,10 +126,10 @@ ErrCode_t HeartRateManager::calculate( float *outBpm )
     }
 
     // Drain ring buffer into local array
-    while ( !ppgBuffer->isEmpty() && count < MAX_SAMPLES )
+    while ( !redLedBuffer->isEmpty() && count < MAX_SAMPLES )
     {
         uint8_t size = sizeof( PpgSample );
-        if ( !ppgBuffer->pop( &samples[count], &size ) ) { break; }
+        if ( !redLedBuffer->pop( &samples[count], &size ) ) { break; }
         count++;
     }
 

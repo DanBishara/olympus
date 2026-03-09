@@ -36,11 +36,19 @@ void ppgWorkHandler( struct k_work *work )
     float ppgCurrent = 0;
 
     PpgManager::Instance().getRedData( &data );
+    ppgCurrent = ( ( float )data / ( ( 1 << ADC_RESOLUTION_BITS ) - 1 ) ) * MAX30101_FS_RANGE;
+    LOG_DBG( "Red LED: %d, Current: %f nA", data, ppgCurrent );
+    HeartRateManager::Instance().pushRedLedSample( ppgCurrent );
 
-    ppgCurrent = ( ( float )data / ( ( 1 << ADC_RESOLUTION_BITS ) - 1 ) ) * MAX30101_FS_RANGE; // in nano amps
-    LOG_DBG( "PPG Data: %d, Current: %f nA", data, ppgCurrent );
+    PpgManager::Instance().getIrData( &data );
+    ppgCurrent = ( ( float )data / ( ( 1 << ADC_RESOLUTION_BITS ) - 1 ) ) * MAX30101_FS_RANGE;
+    LOG_DBG( "IR LED: %d, Current: %f nA", data, ppgCurrent );
+    HeartRateManager::Instance().pushIrLedSample( ppgCurrent );
 
-    HeartRateManager::Instance().pushSample( ppgCurrent );
+    PpgManager::Instance().getGreenData( &data );
+    ppgCurrent = ( ( float )data / ( ( 1 << ADC_RESOLUTION_BITS ) - 1 ) ) * MAX30101_FS_RANGE;
+    LOG_DBG( "Green LED: %d, Current: %f nA", data, ppgCurrent );
+    HeartRateManager::Instance().pushGreenLedSample( ppgCurrent );
 
     PpgManager::Instance().clearInterruptStatus();
 }

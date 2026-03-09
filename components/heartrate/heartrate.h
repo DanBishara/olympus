@@ -29,7 +29,9 @@ class HeartRateManager
 public:
     static HeartRateManager& Instance( void ) { static HeartRateManager instance; return instance; }
     ErrCode_t init( float sampleRateHz );
-    void      pushSample( float sample );
+    void      pushRedLedSample( float sample );
+    void      pushIrLedSample( float sample );
+    void      pushGreenLedSample( float sample );
     ErrCode_t calculate( float *outBpm );
     float     getLastBpm( void ) const { return lastBpm; }
     bool      popBpm( float *outBpm );
@@ -45,7 +47,9 @@ private:
     float lpAlpha;      // IIR low-pass coefficient (~4 Hz)
     float dcEstimate;   // IIR high-pass state
     float lpState;      // IIR low-pass state
-    RingBuffer *ppgBuffer;
+    RingBuffer *redLedBuffer;
+    RingBuffer *irLedBuffer;
+    RingBuffer *greenLedBuffer;
     RingBuffer *bpmBuffer;
     struct k_thread thread;
 };
