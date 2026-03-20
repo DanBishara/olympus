@@ -121,6 +121,7 @@ ErrCode_t PpgManager::init( void )
     // Need to manually enable interrupt
     i2c_reg_write_byte( i2c, DT_REG_ADDR(DT_NODELABEL(ppg)), MAX30101_REG_INT_EN1, MAX30101_INT_EN_BIT_A_FULL | MAX30101_INT_EN_BIT_PPG_RDY );
 
+    clearFifo();
     clearInterruptStatus();
     LOG_INF("PPG Init successful");
 
@@ -173,4 +174,82 @@ void PpgManager::clearInterruptStatus( void )
 {
     uint8_t buffer = {0};
     i2c_burst_read( i2c, DT_REG_ADDR(DT_NODELABEL(ppg)), MAX30101_REG_INT_STS1, &buffer, sizeof(buffer) );
+}
+
+// @brief Clear the MAX30101 FIFO by resetting the write pointer, overflow counter,
+//        and read pointer to zero. Call this before starting a new measurement window
+//        so stale samples from a previous session are not processed.
+void PpgManager::clearFifo( void )
+{
+    i2c_reg_write_byte( i2c, DT_REG_ADDR(DT_NODELABEL(ppg)), MAX30101_REG_FIFO_WR,  0x00 );
+    i2c_reg_write_byte( i2c, DT_REG_ADDR(DT_NODELABEL(ppg)), MAX30101_REG_FIFO_OVF, 0x00 );
+    i2c_reg_write_byte( i2c, DT_REG_ADDR(DT_NODELABEL(ppg)), MAX30101_REG_FIFO_RD,  0x00 );
+}
+
+// @brief Shut down the MAX30101 by setting the SHDN bit in MODE_CFG and disabling the GPIO interrupt.
+//        Call this when heart rate measurement is not needed to free up I2C and reduce power draw.
+// @return Error code
+ErrCode_t PpgManager::disable( void )
+{
+    ErrCode_t errCode = ErrCode_Internal;
+    uint8_t   modeCfg = 0;
+
+    /* Stop the GPIO interrupt so no new work items are queued */
+    gpio_pin_interrupt_configure_dt( &irq_pin, GPIO_INT_DISABLE );
+
+    /* Read current MODE_CFG, set SHDN bit (bit 7), write back */
+    if( i2c_reg_read_byte( i2c, DT_REG_ADDR(DT_NODELABEL(ppg)), MAX30101_REG_MODE_CFG, &modeCfg ) != 0 )
+    {
+        LOG_ERR( "Failed to read MODE_CFG!" );
+        goto exit;
+    }
+
+    modeCfg |= BIT( 7 );
+    if( i2c_reg_write_byte( i2c, DT_REG_ADDR(DT_NODELABEL(ppg)), MAX30101_REG_MODE_CFG, modeCfg ) != 0 )
+    {
+        LOG_ERR( "Failed to write MODE_CFG!" );
+        goto exit;
+    }
+
+    LOG_INF( "MAX30101 disabled" );
+    errCode = ErrCode_Success;
+exit:
+    return errCode;
+}
+
+// @brief Wake the MAX30101 by clearing the SHDN bit in MODE_CFG and re-enabling the GPIO interrupt.
+//        Call this before starting a heart rate measurement window.
+// @return Error code
+ErrCode_t PpgManager::enable( void )
+{
+    ErrCode_t errCode = ErrCode_Internal;
+    uint8_t   modeCfg = 0;
+
+    /* Read current MODE_CFG, clear SHDN bit (bit 7), write back */
+    if( i2c_reg_read_byte( i2c, DT_REG_ADDR(DT_NODELABEL(ppg)), MAX30101_REG_MODE_CFG, &modeCfg ) != 0 )
+    {
+        LOG_ERR( "Failed to read MODE_CFG!" );
+        goto exit;
+    }
+
+    modeCfg &= ~BIT( 7 );
+    if( i2c_reg_write_byte( i2c, DT_REG_ADDR(DT_NODELABEL(ppg)), MAX30101_REG_MODE_CFG, modeCfg ) != 0 )
+    {
+        LOG_ERR( "Failed to write MODE_CFG!" );
+        goto exit;
+    }
+
+    /* Clear any stale interrupt flags before re-arming the GPIO interrupt */
+    clearInterruptStatus();
+
+    if( gpio_pin_interrupt_configure_dt( &irq_pin, GPIO_INT_EDGE_FALLING ) != 0 )
+    {
+        LOG_ERR( "Failed to re-enable GPIO interrupt!" );
+        goto exit;
+    }
+
+    LOG_INF( "MAX30101 enabled" );
+    errCode = ErrCode_Success;
+exit:
+    return errCode;
 }

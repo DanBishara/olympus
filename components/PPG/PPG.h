@@ -97,5 +97,8 @@ public:
     static PpgManager& Instance( void ) { static PpgManager instance; return instance; }
     ErrCode_t init( void );
     ErrCode_t getSensorData( int * outData );
+    ErrCode_t disable( void );
+    ErrCode_t enable( void );
     void clearInterruptStatus( void );
+    void clearFifo( void );
 };

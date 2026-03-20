@@ -9,8 +9,14 @@
 #include <math.h>
 
 #include "heartrate.h"
+#include "PPG.h"
 
 #define PI 3.14159265f
+
+// How long to run the PPG sensor before taking a measurement.
+// At MAX30101_EFFECTIVE_SR samples/s, this should be enough to fill
+// the ring buffer with a clean window of data.
+#define HEARTRATE_SAMPLE_WINDOW_S   ( 10 )
 
 LOG_MODULE_REGISTER( HeartRateManager, CONFIG_LOG_DEFAULT_LEVEL );
 
@@ -66,8 +72,15 @@ void HeartRateManager::threadFunc( void *p1, void *p2, void *p3 )
 {
     while ( true )
     {
-        k_sleep( K_SECONDS( 5 ) );
+        // Enable the sensor and collect samples for the measurement window
+        PpgManager::Instance().enable();
+        k_sleep( K_SECONDS( HEARTRATE_SAMPLE_WINDOW_S ) );
+
         HeartRateManager::Instance().calculate( &HeartRateManager::Instance().lastBpm );
+
+        // Shut the sensor down so the accelerometer has full I2C throughput
+        PpgManager::Instance().disable();
+        k_sleep( K_MINUTES( 5 ) );
     }
 }
 
